@@ -53,10 +53,8 @@ sentenceSat :: PGF -> String -> SAT String
 sentenceSat pgf sent =
   let
     funLists = sentenceFunctions pgf sent
-    mkSat (t,fs) = Imp (SVar t) (Conj $ map (SVar . showCId) fs)
   in
-    Dis (map mkSat $ zip ["t" ++ show i | i <- [0..]] (map nub funLists))
-
+    Dis (map mkSatImp $ zip ["t" ++ show i | i <- [0..]] funLists)
 
 
 treeToFunList :: Tree -> [CId]
@@ -71,3 +69,5 @@ solveSat :: PGF -> [String] -> [String]
 solveSat pgf sents =
   undefined -- map (sentenceSat pgf) sentences
 
+  
+mkSatImp (t,fs) = Imp (SVar t) (Conj $ map (SVar . showCId) fs)
