@@ -8,12 +8,28 @@ import Data.List
 
 data SAT a = SVar a | Conj [SAT a] | Dis [SAT a] | Imp (SAT a) (SAT a)
 
+data ConstraintAtom a = Num Int | CVar a | Neg (ConstraintAtom a) | Sum [ConstraintAtom a]
+
+data Constraint a = Equal (ConstraintAtom a) (ConstraintAtom a) | LessEqual (ConstraintAtom a) (ConstraintAtom a) | IsZero (ConstraintAtom a) | IsOne (ConstraintAtom a)
+
 instance Show a => Show (SAT a) where
   show (SVar a) = show a
   show (Conj ts) = intercalate " /\\ " (map show ts)
   show (Dis ts) = intercalate " \\/ " (map show ts)
   show (Imp p c) = show p ++ " => " ++ show c ++ "\n"
 
+instance Show a => Show (ConstraintAtom a) where
+  show (Num n) = show n
+  show (CVar v) = show v
+  show (Neg c) = "-" ++ show c
+  show (Sum cs) = (show $ head cs) ++ foldl (\s c -> s ++ case c of {(Neg c) -> "-" ++ show c ; otherwise -> "+" ++ show c }) "" (tail cs)
+
+instance Show a => Show (Constraint a) where
+  show (Equal c1 c2) = show c1 ++ "=" ++ show c2
+  show (LessEqual c1 c2) = show c1 ++ "≤" ++ show c2
+  show (IsZero c) = show c ++ "=0"
+  show (IsOne c) = show c ++ "=1"
+  
 sentenceTrees :: PGF -> String -> [Tree]
 sentenceTrees pgf sent =
   parse pgf (head $ languages pgf) (startCat pgf) sent
@@ -40,6 +56,7 @@ sentenceSat pgf sent =
     mkSat (t,fs) = Imp (SVar t) (Conj $ map (SVar . showCId) fs)
   in
     Dis (map mkSat $ zip ["t" ++ show i | i <- [0..]] (map nub funLists))
+
 
 
 treeToFunList :: Tree -> [CId]
