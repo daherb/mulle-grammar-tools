@@ -36,7 +36,6 @@ sentenceFunctionsCount pgf sent =
 sentenceSat :: PGF -> String -> SAT String
 sentenceSat pgf sent =
   let
-    treeList = sentenceTrees pgf sent
     funLists = sentenceFunctions pgf sent
     mkSat (t,fs) = Imp (SVar t) (Conj $ map (SVar . showCId) fs)
   in
