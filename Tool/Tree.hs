@@ -56,6 +56,13 @@ sentenceSat pgf sent =
   in
     Dis (map mkSatImp $ zip ["t" ++ show i | i <- [0..]] funLists)
 
+multiSentSat :: PGF -> [String] -> SAT String
+multiSentSat pgf sents =
+  let
+    funListsS = map (sentenceFunctions pgf) sents
+    listLengths = map length funListsS
+  in
+    Conj $ map (Dis . map mkSatImp) (splitAts listLengths $ zip ["t" ++ show i | i <- [0..]] (concat funListsS) )
 
 treeToFunList :: Tree -> [CId]
 treeToFunList (EApp e1 e2) = treeToFunList e1 ++ treeToFunList e2
@@ -69,5 +76,10 @@ solveSat :: PGF -> [String] -> [String]
 solveSat pgf sents =
   undefined -- map (sentenceSat pgf) sentences
 
+splitAts :: [Int] -> [a] -> [[a]]
+splitAts [] _ = []
+splitAts _ [] = []
+splitAts (i:is) es =
+  take i es:splitAts is (drop i es)
   
 mkSatImp (t,fs) = Imp (SVar t) (Conj $ map (SVar . showCId) fs)
