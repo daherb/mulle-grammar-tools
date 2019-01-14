@@ -52,6 +52,23 @@ multiSentSat pgf sents =
   in
     Conj $ map (Dis . map mkSatImp) (splitAts listLengths $ zip ["t" ++ show i | i <- [0..]] (concat funListsS) )
 
+multiSentConstraints :: PGF -> [String] -> Constraint String
+multiSentConstraints pgf sents =
+  let
+    rules = map showCId $ functions pgf
+    sats = multiSentSat pgf sents
+  in
+    C rules $ map (map unImp) $ map unDis $ unConj sats
+  where
+    unConj (Conj l) = l
+    unConj _ = []
+    unDis (Dis l) = l
+    unDis _ = []
+    unImp (Imp (SVar s) c) = (s,map unVar $ unConj c)
+    unImp _ = ([],[])
+    unVar (SVar v) = v
+    unVar _ = undefined
+
 treeToFunList :: Tree -> [CId]
 treeToFunList (EApp e1 e2) = treeToFunList e1 ++ treeToFunList e2
 treeToFunList (EFun f) = [f]
