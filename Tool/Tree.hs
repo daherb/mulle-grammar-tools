@@ -69,6 +69,49 @@ multiSentConstraints pgf sents =
     unVar (SVar v) = v
     unVar _ = undefined
 
+printConstraintsAsAMPL :: Constraint String -> String
+printConstraintsAsAMPL (C rules trees) =
+  let
+    treeVars = concatMap (map fst) trees
+    ruleVars = nub $ concatMap (concatMap snd) trees
+  in
+    unlines $
+      ["var " ++ v ++ ", binary;" | v <- ruleVars ] ++
+      ["var " ++ v ++ ", binary;" | v <- treeVars ] ++
+      ["minimize rules : " ++ intercalate " + " ruleVars ++ ";",
+       "minimize trees : " ++ intercalate " + " treeVars ++ ";"] ++
+      [ "s.t. cs" ++ show i ++ ": " ++ intercalate " + " c ++ " >= 1 ; " | (i,c) <- zip [0..] (map (map fst) trees)] ++
+      [ "s.t. c" ++ show i ++ ": " ++ c ++ "; " | (i,c) <- zip [0..] [show (length st) ++ " * " ++ ft ++ " - (" ++ intercalate " + " st ++ ") <= 0" | s <- trees, (ft,st) <- s]] ++
+      ["solve;",
+       "display " ++ intercalate ", " ruleVars ++ ";",
+       "display " ++ intercalate ", " treeVars ++ ";"
+      ]
+
+printConstraintsAsLP :: Constraint String -> String
+printConstraintsAsLP (C rules trees) =
+  let
+    treeVars = concatMap (map fst) trees
+  in
+    clean $ unlines $
+      ["min: " ++ intercalate " + " rules ++ " + " ++ intercalate " + " treeVars ++ ";"] ++
+      [ "cs" ++ show i ++ ": " ++ intercalate " + " c ++ " >= 1 ; " | (i,c) <- zip [0..] (map (map fst) trees)] ++
+      [ "c" ++ show i ++ ": " ++ c ++ "; " | (i,c) <- zip [0..] [show (length st) ++ " * " ++ ft ++ " - " ++ intercalate " - " st ++ " <= 0" | s <- trees, (ft,st) <- s]] ++
+      ["bin " ++ v ++ ";" | v <- rules] ++
+      ["bin " ++ v ++ ";" | v <- treeVars ]
+
+-- printConstraintsAsMPS :: String -> Constraint String -> String
+-- printConstraintsAsMPS name (C rules trees) =
+--   let
+--     treeVars = concatMap (map fst) trees
+--   in
+--     unlines $
+--       ["NAME          " ++ name] ++
+--       ["min: " ++ intercalate " + " rules ++ " + " ++ intercalate " + " treeVars ++ ";"] ++
+--       [ "cs" ++ show i ++ ": " ++ intercalate " + " c ++ " >= 1 ; " | (i,c) <- zip [0..] (map (map fst) trees)] ++
+--       [ "c" ++ show i ++ ": " ++ c ++ "; " | (i,c) <- zip [0..] [show (length st) ++ " * " ++ ft ++ " - " ++ intercalate " - " st ++ " <= 0" | s <- trees, (ft,st) <- s]] ++
+--       ["bin " ++ v ++ ";" | v <- rules] ++
+--       ["bin " ++ v ++ ";" | v <- treeVars ]
+--       ["ENDATA"]
 treeToFunList :: Tree -> [CId]
 treeToFunList (EApp e1 e2) = treeToFunList e1 ++ treeToFunList e2
 treeToFunList (EFun f) = [f]
