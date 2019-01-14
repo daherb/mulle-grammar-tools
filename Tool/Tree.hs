@@ -1,4 +1,4 @@
-module Tree where
+module Tool.Tree where
 
 import PGF
 import PGF.Internal
