@@ -112,6 +112,9 @@ printConstraintsAsLP (C rules trees) =
 --       ["bin " ++ v ++ ";" | v <- rules] ++
 --       ["bin " ++ v ++ ";" | v <- treeVars ]
 --       ["ENDATA"]
+
+-- Helper functions
+
 treeToFunList :: Tree -> [CId]
 treeToFunList (EApp e1 e2) = treeToFunList e1 ++ treeToFunList e2
 treeToFunList (EFun f) = [f]
@@ -131,3 +134,6 @@ splitAts (i:is) es =
   take i es:splitAts is (drop i es)
   
 mkSatImp (t,fs) = Imp (SVar t) (Conj $ map (SVar . showCId) fs)
+
+clean :: String -> String
+clean = filter (not . flip elem "_")
