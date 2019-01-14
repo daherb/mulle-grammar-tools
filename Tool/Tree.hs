@@ -120,14 +120,20 @@ printConstraintsAsCPLEXLP (C rules trees) =
 --   let
 --     treeVars = concatMap (map fst) trees
 --   in
---     unlines $
---       ["NAME          " ++ name] ++
---       ["min: " ++ intercalate " + " rules ++ " + " ++ intercalate " + " treeVars ++ ";"] ++
---       [ "cs" ++ show i ++ ": " ++ intercalate " + " c ++ " >= 1 ; " | (i,c) <- zip [0..] (map (map fst) trees)] ++
---       [ "c" ++ show i ++ ": " ++ c ++ "; " | (i,c) <- zip [0..] [show (length st) ++ " * " ++ ft ++ " - " ++ intercalate " - " st ++ " <= 0" | s <- trees, (ft,st) <- s]] ++
---       ["bin " ++ v ++ ";" | v <- rules] ++
---       ["bin " ++ v ++ ";" | v <- treeVars ]
---       ["ENDATA"]
+--      unlines $
+--      ["NAME" `addField` " " `addField` name] ++
+--      ["ROWS","" `addField` "N" `addField` "COST"] ++
+--      [ "" `addField` "G " `addField` ("CS" ++ show i) | (i,c) <- zip [0..] (map (map fst) trees)] ++
+--      [ "" `addField` "L" `addField` ("C" ++ show i) | (i,c) <- zip [0..] [show (length st) ++ " * " ++ ft ++ " - " ++ intercalate " - " st ++ " <= 0" | s <- trees, (ft,st) <- s]] ++
+     
+-- --       ["min: " ++ intercalate " + " rules ++ " + " ++ intercalate " + " treeVars ++ ";"] ++
+-- --       [ "cs" ++ show i ++ ": " ++ intercalate " + " c ++ " >= 1 ; " | (i,c) <- zip [0..] (map (map fst) trees)] ++
+-- --       [ "c" ++ show i ++ ": " ++ c ++ "; " | (i,c) <- zip [0..] [show (length st) ++ " * " ++ ft ++ " - " ++ intercalate " - " st ++ " <= 0" | s <- trees, (ft,st) <- s]] ++
+--      ["BOUNDS"] ++
+--      ["" `addField` "BV" `addField` v | v <- rules] ++
+--      ["" `addField` "BV" `addField` v | v <- treeVars ] ++
+--      ["ENDATA"]
+
 
 -- Helper functions
 
@@ -153,3 +159,16 @@ mkSatImp (t,fs) = Imp (SVar t) (Conj $ map (SVar . showCId) fs)
 
 clean :: String -> String
 clean = filter (not . flip elem "_")
+
+addField :: String -> String -> String
+addField s1 s2
+  | length s2 > 8 = error "value too long"
+  | length s1 == 0 = " " ++ s2
+  | length s1 < 5  = s1 ++ align 5 (length s1) ++ s2
+  | length s1 < 15 = s1 ++ align 15 (length s1) ++ s2
+  | length s1 < 25 = s1 ++ align 25 (length s1) ++ s2
+  | length s1 < 40 = s1 ++ align 40 (length s1) ++ s2
+  | length s1 < 50 = s1 ++ align 50 (length s1) ++ s2
+  | otherwise      = s1 ++ "  " ++ s2
+  where
+    align x y = replicate (x - y - 1) ' '
