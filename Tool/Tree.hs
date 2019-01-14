@@ -99,6 +99,22 @@ printConstraintsAsLP (C rules trees) =
       ["bin " ++ v ++ ";" | v <- rules] ++
       ["bin " ++ v ++ ";" | v <- treeVars ]
 
+printConstraintsAsCPLEXLP :: Constraint String -> String
+printConstraintsAsCPLEXLP (C rules trees) =
+  let
+    treeVars = concatMap (map fst) trees
+  in
+    clean $ unlines $
+      [ "Minimize" ] ++ 
+      [ " obj: " ++ intercalate " + " rules ++ " + " ++ intercalate " + " treeVars ] ++
+      [ "Subject to"] ++ 
+      [ " cs: " ++ show i ++ ": " ++ intercalate " + " c ++ " >= 1 ; " | (i,c) <- zip [0..] (map (map fst) trees)] ++
+      [ " c: " ++ show i ++ ": " ++ c ++ "; " | (i,c) <- zip [0..] [show (length st) ++ " * " ++ ft ++ " - " ++ intercalate " - " st ++ " <= 0" | s <- trees, (ft,st) <- s]] ++
+      [ "Binary"] ++ 
+      [ " " ++ v | v <- rules] ++
+      [ " " ++ v | v <- treeVars ] ++
+      [ "End" ]
+      
 -- printConstraintsAsMPS :: String -> Constraint String -> String
 -- printConstraintsAsMPS name (C rules trees) =
 --   let
