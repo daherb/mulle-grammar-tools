@@ -8,6 +8,8 @@ import Data.List
 
 data SAT a = SVar a | Conj [SAT a] | Dis [SAT a] | Imp (SAT a) (SAT a)
 
+data LPFormat = LPSolve | CPLEX ;
+data ConstraintFormat = AMPL | LP LPFormat ; -- | MPS String ;
 
 data Constraint a = C { rules :: [a], trees :: [[(a,[a])]] } deriving Show; 
 
@@ -16,7 +18,6 @@ instance Show a => Show (SAT a) where
   show (Conj ts) = intercalate " /\\ " (map show ts)
   show (Dis ts) = intercalate " \\/ " (map show ts)
   show (Imp p c) = show p ++ " => " ++ show c ++ "\n"
-
   
 sentenceTrees :: PGF -> String -> [Tree]
 sentenceTrees pgf sent =
@@ -69,8 +70,8 @@ multiSentConstraints pgf sents =
     unVar (SVar v) = v
     unVar _ = undefined
 
-printConstraintsAsAMPL :: Constraint String -> String
-printConstraintsAsAMPL (C rules trees) =
+printConstraints :: ConstraintFormat -> Constraint String -> String
+printConstraints AMPL (C rules trees) =
   let
     treeVars = concatMap (map fst) trees
     ruleVars = nub $ concatMap (concatMap snd) trees
@@ -86,9 +87,8 @@ printConstraintsAsAMPL (C rules trees) =
        "display " ++ intercalate ", " ruleVars ++ ";",
        "display " ++ intercalate ", " treeVars ++ ";"
       ]
-
-printConstraintsAsLP :: Constraint String -> String
-printConstraintsAsLP (C rules trees) =
+      
+printConstraints (LP LPSolve) (C rules trees) =
   let
     treeVars = concatMap (map fst) trees
   in
@@ -98,9 +98,8 @@ printConstraintsAsLP (C rules trees) =
       [ "c" ++ show i ++ ": " ++ c ++ "; " | (i,c) <- zip [0..] [show (length st) ++ " * " ++ ft ++ " - " ++ intercalate " - " st ++ " <= 0" | s <- trees, (ft,st) <- s]] ++
       ["bin " ++ v ++ ";" | v <- rules] ++
       ["bin " ++ v ++ ";" | v <- treeVars ]
-
-printConstraintsAsCPLEXLP :: Constraint String -> String
-printConstraintsAsCPLEXLP (C rules trees) =
+      
+printConstraints (LP CPLEX) (C rules trees) =
   let
     treeVars = concatMap (map fst) trees
   in
@@ -115,8 +114,7 @@ printConstraintsAsCPLEXLP (C rules trees) =
       [ " " ++ v | v <- treeVars ] ++
       [ "End" ]
       
--- printConstraintsAsMPS :: String -> Constraint String -> String
--- printConstraintsAsMPS name (C rules trees) =
+-- printConstraints (MPS name) (C rules trees) =
 --   let
 --     treeVars = concatMap (map fst) trees
 --   in
