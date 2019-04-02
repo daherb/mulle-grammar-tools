@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Lexicon where
+module Tool.Lexicon where
 
 import GHC.Generics
 
