@@ -105,7 +105,7 @@ printConstraints AMPL cp =
     (LCP lts) = convertToLabeledProblem cp
     vars = [(t,rs) | (s,ts) <- lts, (t,rs) <- ts]
     treeVars = map fst vars 
-    ruleVars = nub . concatMap snd $ vars
+    ruleVars = concatMap snd $ vars
   in
     unlines $
       ["var " ++ v ++ ", binary;" | v <- ruleVars ] ++
@@ -115,8 +115,8 @@ printConstraints AMPL cp =
       [ "s.t. cs" ++ show i ++ ": " ++ intercalate " + " c ++ " >= 1 ; " | (i,c) <- zip [0..] [map fst ts | (s,ts) <- lts]] ++
       [ "s.t. c" ++ show i ++ ": " ++ c ++ "; " | (i,c) <- zip [0..] [show (length rs) ++ " * " ++ t ++ " - (" ++ intercalate " + " rs ++ ") <= 0" | (s,ts) <- lts, (t,rs) <- ts]] ++
       ["solve;",
-       "display " ++ intercalate ", " ruleVars ++ ";",
-       "display " ++ intercalate ", " treeVars ++ ";"
+       "display " ++ intercalate ", " (nub ruleVars) ++ ";",
+       "display " ++ intercalate ", " (nub treeVars) ++ ";"
       ]
 
 -- | Function to print a constraint problem as LPSolve LP
@@ -125,32 +125,37 @@ printConstraints (LP LPSolve) cp =
     (LCP lts) = convertToLabeledProblem cp
     vars = [(t,rs) | (s,ts) <- lts, (t,rs) <- ts]
     treeVars = map fst vars
-    ruleVars = nub . concatMap snd $ vars 
+    ruleVars = concatMap snd $ vars 
   in
     clean $ unlines $
       ["min: " ++ intercalate " + " ruleVars ++ " + " ++ intercalate " + " treeVars ++ ";"] ++
       [ "cs" ++ show i ++ ": " ++ intercalate " + " c ++ " >= 1 ; " | (i,c) <- zip [0..] [map fst ts | (s,ts) <- lts]] ++
       [ "c" ++ show i ++ ": " ++ c ++ "; " | (i,c) <- zip [0..] [show (length rs) ++ " * " ++ t ++ " - " ++ intercalate " - " rs ++ " <= 0" | (s,ts) <- lts, (t,rs) <- ts]] ++
-      ["bin " ++ v ++ ";" | v <- ruleVars ] ++
-      ["bin " ++ v ++ ";" | v <- treeVars ]
+      ["bin " ++ v ++ ";" | v <- nub ruleVars ] ++
+      ["bin " ++ v ++ ";" | v <- nub treeVars ]
 
 -- | Function to print a constraint problem as CPLEX LP
 printConstraints (LP CPLEX) cp =
   let
     (LCP lts) = convertToLabeledProblem cp
     vars = [(t,rs) | (s,ts) <- lts, (t,rs) <- ts]
+    sentVars = map fst lts
     treeVars = map fst vars
-    ruleVars = nub . concatMap snd $ vars 
+    ruleVars = concatMap snd $ vars
+    ruleCounts = Prelude.foldl (\m k -> M.alter (maybe (Just 1) (\n -> Just (n + 1))) k m) M.empty $ ruleVars
+    ruleCount = length $ nub ruleVars
   in
     unlines $
-      [ "Minimize" ] ++ 
-      [ " obj: " ++ intercalate " + " ruleVars ++ " + " ++ intercalate " + " treeVars ] ++
+      [ "Minimize" ] ++
+--      [ " obj: " ++ show (1/(fromIntegral .length $ sentVars)) ++ "(" ++ intercalate " + " treeVars ++ ")"] ++ -- average number of trees per sentence
+--      [ " obj: " ++ intercalate " + " (map (\r -> (show $ (fromIntegral . floor) (ruleCounts M.! r / fromIntegral ruleCount * 100) / 100) ++ r) ruleVars) ++ " + " ++ intercalate " + " treeVars ] ++ -- weighted rules plus number of trees
+      [ " obj: \"" ++ intercalate "\" + \"" (nub ruleVars) ++ "\" + " ++ intercalate " + " (nub treeVars) ++ "" ] ++ -- number of trees plus number of rules
       [ "Subject to"] ++ 
       [ " cs" ++ show i ++ ": " ++ intercalate " + " c ++ " >= 1" | (i,c) <- zip [0..] [map fst ts | (s,ts) <- lts]] ++
-      [ " c" ++ show i ++ ": " ++ c | (i,c) <- zip [0..] [show (length rs) ++ "" ++ t ++ " - " ++ intercalate " - " rs ++ " <= 0" | (s,ts) <- lts, (t,rs) <- ts]] ++
+      [ " c" ++ show i ++ ": " ++ c | (i,c) <- zip [0..] [show (length rs) ++ "" ++ t ++ " - \"" ++ intercalate "\" - \"" rs ++ "\" <= 0" | (s,ts) <- lts, (t,rs) <- ts]] ++
       [ "Binary"] ++ 
-      [ " " ++ v | v <- ruleVars ] ++
-      [ " " ++ v | v <- treeVars ] ++
+      [ " \"" ++ v ++ "\"" | v <- nub ruleVars ] ++
+      [ " " ++ v | v <- nub treeVars ] ++
       [ "End" ]
 
 -- Partial implementation of the MPS exporter but the format is a pain in the ass
