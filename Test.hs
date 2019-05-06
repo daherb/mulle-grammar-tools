@@ -2,8 +2,14 @@ module Test (testLat,testSwe,testEng) where
 import PGF
 import Tool.Tree
 import System.Process( system )
-
+import qualified Data.Map.Lazy as M
+import qualified Text.XML.Expat.SAX as X
+import qualified Data.ByteString.Lazy as BS
+import Data.Maybe
+import Data.Char
+import Debug.Trace
 cplex = "/home/herb/opt/cplex/cplex/bin/x86-64_linux/cplex"
+
 sentsLat = 
   [
     "imperium Romanum magnum est",
@@ -23,8 +29,16 @@ sentsLat =
 
 testLat =
   do
+    putStrLn ">>> Read PGF"
     pgf <- readPGF "data/test-corpus/la/Prima.pgf"
-    writeFile "/tmp/cplex.lp" $ printConstraints (LP CPLEX) $ convertToSetProblem $ mkMultisetProblem pgf sentsLat
+    putStrLn ">>> Create problem (Step 1)"
+    let tmp = mkMultisetProblem pgf sentsLat
+    putStrLn ">>> Create problem (Step 2)"
+    let problem = convertToSetProblem tmp
+    putStrLn ">>> Create Probelm (Step 3)"
+    let cplex = printConstraints (LP CPLEX) problem
+    putStrLn ">>> Write file"
+    writeFile "/tmp/cplex.lp" cplex 
     runCPLEX "/tmp/cplex.lp" "Prima" "PrimaCut" "Lat"
   
 sentsSwe =
@@ -69,24 +83,66 @@ runCPLEX fn orig abs lang =
       [ "r " ++ fn
       , "opt"
       , "display solution variables *"
---      , "xecute rm -f /tmp/cplex.sol"
-      , "write cplex.sol"
+      , "xecute rm -f /tmp/cplex.sol"
+      , "write /tmp/cplex.sol all"
       , "quit"
       ]
     putStrLn "+++ Starting CPLEX..."
     system $ cplex ++ " < /tmp/cplex.in" -- " > /tmp/cplex.out"
     putStrLn "+++ Cleaning up solution..."
     system "rm -f /tmp/cplex.var"
-    system "xml sel -t -v '//variable[@value=\"1\"]/@name' /tmp/cplex.sol | sed s/\\\"//g | egrep -v 's[[:digit:]]+t[[:digit:]]' > /tmp/cplex.var"
     putStrLn "+++ Reading solution..."
-    s <- readFile "/tmp/cplex.var"
+    s <- BS.readFile "/tmp/cplex.sol"
+    let rs = xmlToRules s
     let a = "abstract " ++ abs ++ " = " ++ orig ++" ; "
     writeFile (abs ++ ".gf") a
     putStrLn a
-    let c = unlines $ 
-            [ "concrete " ++ abs ++ lang ++ " of " ++ abs ++ " = Cat" ++ lang ++ " ** open (X=" ++ orig ++ lang ++ ") in {"
-            , "  lin" ] ++
-            [ "    " ++ r ++ " = X." ++ r ++ " ; " | r <- lines s] ++
-            [ " } ; " ]
-    writeFile (abs ++ lang ++ ".gf") c
-    putStrLn c
+    mapM_ (\(ct,rs) -> do
+             let fn = abs ++ lang ++ show ct
+             let c = unlines $ 
+                   [ "concrete " ++ fn ++ " of " ++ abs ++ " = Cat" ++ lang ++ ",Grammar" ++ lang ++ "[ListS,ListAP,ListNP] ** open (X=" ++ orig ++ lang ++ ") in {"
+                   , "  lin" ] ++
+                   [ "    " ++ read r ++ " = X." ++ read r ++ " ; " | r <- rs, isRule r] ++
+                   [ " } ; " ]
+             writeFile (fn ++ ".gf") c
+             putStrLn c
+         ) $ M.toList rs
+
+isRule :: String -> Bool
+isRule = not . isId
+  where
+    isId [] = True
+    isId ('s':is) = isId is
+    isId ('t':is) = isId is
+    isId (c  :is) | isDigit c = isId is
+    isId _  = False
+
+xmlToRules :: BS.ByteString -> M.Map Int [String]
+xmlToRules s =
+  saxToRules $ X.parse X.defaultParseOptions s
+  where
+    saxToRules :: [X.SAXEvent String String] -> M.Map Int [String]
+    saxToRules = findSolution 0
+    findSolution :: Int -> [X.SAXEvent String String] -> M.Map Int [String]
+    findSolution ct [] = M.empty
+    findSolution ct (X.StartElement "CPLEXSolution" _:es) =
+      findHeader ct es
+    findSolution ct (_:es) =
+      findSolution ct es
+    findHeader ct (X.StartElement "header" as:es)
+      | not $ elem ("solutionName","incumbent") as =
+        findVariable (ct + 1) es
+      | otherwise = findSolution ct es
+    findHeader ct (_:es) =
+      findHeader ct es
+    findVariable ct (X.StartElement "variable" as:es)
+      | elem ("value","1") as = 
+        let 
+          rs = findVariable ct es
+          Just v = lookup "name" as
+        in M.alter (Just . maybe [v] (v:)) ct rs
+      | otherwise = findSolution ct es
+    findVariable ct (X.EndElement "CPLEXSolution":es) =
+      findSolution ct es
+    findVariable ct (e:es) =
+      findVariable ct es
