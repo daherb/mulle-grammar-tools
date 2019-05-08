@@ -141,27 +141,32 @@ xmlToRules s =
   saxToRules $ X.parse X.defaultParseOptions s
   where
     saxToRules :: [X.SAXEvent String String] -> M.Map Int [String]
-    saxToRules = findSolution 0
-    findSolution :: Int -> [X.SAXEvent String String] -> M.Map Int [String]
-    findSolution ct [] = M.empty
-    findSolution ct (X.StartElement "CPLEXSolution" _:es) =
-      findHeader ct es
-    findSolution ct (_:es) =
-      findSolution ct es
-    findHeader ct (X.StartElement "header" as:es)
+    saxToRules = findSolution
+    findSolution :: [X.SAXEvent String String] -> M.Map Int [String]
+    findSolution [] = M.empty
+    findSolution (X.StartElement "CPLEXSolution" _:es) =
+      findHeader es
+    findSolution (_:es) =
+      findSolution es
+    findHeader :: [X.SAXEvent String String] -> M.Map Int [String]
+    findHeader (X.StartElement "header" as:es)
       | not $ elem ("solutionName","incumbent") as =
-        findVariable (ct + 1) es
-      | otherwise = findSolution ct es
-    findHeader ct (_:es) =
-      findHeader ct es
+        let
+          Just index = read <$> lookup "solutionIndex" as
+        in
+          findVariable index es
+      | otherwise = findSolution es
+    findHeader (_:es) =
+      findHeader  es
+    findVariable :: Int -> [X.SAXEvent String String] -> M.Map Int [String]
     findVariable ct (X.StartElement "variable" as:es)
       | elem ("value","1") as = 
         let 
           rs = findVariable ct es
           Just v = lookup "name" as
         in M.alter (Just . maybe [v] (v:)) ct rs
-      | otherwise = findSolution ct es
+      | otherwise = findVariable ct es
     findVariable ct (X.EndElement "CPLEXSolution":es) =
-      findSolution ct es
+      findSolution es
     findVariable ct (e:es) =
       findVariable ct es
