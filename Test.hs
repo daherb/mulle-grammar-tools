@@ -117,7 +117,7 @@ runCPLEX fn orig abs lang =
     writeFile (abs ++ ".gf") a
     putStrLn a
     mapM_ (\(ct,rs) -> do
-             let fn = abs ++ lang ++ show ct
+             let fn = abs ++ show ct ++ lang 
              let c = unlines $ 
                    [ "concrete " ++ fn ++ " of " ++ abs ++ " = Cat" ++ lang ++ ",Grammar" ++ lang ++ "[ListS,ListAP,ListNP] ** open (X=" ++ orig ++ lang ++ ") in {"
                    , "  lin" ] ++
