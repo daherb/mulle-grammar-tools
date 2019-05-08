@@ -1,4 +1,4 @@
-module Test (testLat,testSwe,testEng) where
+module Test (testLat,testSwe,testEng,xmlToRules) where
 import PGF
 import Tool.Tree
 import System.Process( system )
@@ -8,6 +8,7 @@ import qualified Data.ByteString.Lazy as BS
 import Data.Maybe
 import Data.Char
 import Debug.Trace
+
 cplex = "/home/herb/opt/cplex/cplex/bin/x86-64_linux/cplex"
 
 sentsLat = 
@@ -18,7 +19,7 @@ sentsLat =
     "Caesar Augustus imperator Romanus est",
     "imperium Romanum tenet",
     "multas civitates externas vincit",
---    "saepe civitates victae provinciae deveniunt",
+    "saepe civitates victae provinciae deveniunt",
     "Gallia provincia Romana est",
     "Africa provincia Romana est",
     "Gallia et Africa provinciae Romanae sunt",
@@ -28,18 +29,19 @@ sentsLat =
   ]
 
 testLat =
-  do
-    putStrLn ">>> Read PGF"
-    pgf <- readPGF "data/test-corpus/la/Prima.pgf"
-    putStrLn ">>> Create problem (Step 1)"
-    let tmp = mkMultisetProblem pgf sentsLat
-    putStrLn ">>> Create problem (Step 2)"
-    let problem = convertToSetProblem tmp
-    putStrLn ">>> Create Probelm (Step 3)"
-    let cplex = printConstraints (LP CPLEX) problem
-    putStrLn ">>> Write file"
-    writeFile "/tmp/cplex.lp" cplex 
-    runCPLEX "/tmp/cplex.lp" "Prima" "PrimaCut" "Lat"
+  runTest "data/test-corpus/la/Prima.pgf" sentsLat "Prima" "PrimaCut" "Lat"
+  -- do
+  --   putStrLn ">>> Read PGF"
+  --   pgf <- readPGF "data/test-corpus/la/Prima.pgf"
+  --   putStrLn ">>> Create problem (Step 1)"
+  --   let tmp = mkMultisetProblem pgf sentsLat
+  --   putStrLn ">>> Create problem (Step 2)"
+  --   let problem = convertToSetProblem tmp
+  --   putStrLn ">>> Create Probelm (Step 3)"
+  --   let cplex = printConstraints (LP CPLEX) problem
+  --   putStrLn ">>> Write file"
+  --   writeFile "/tmp/cplex.lp" cplex 
+  --   runCPLEX "/tmp/cplex.lp" "Prima" "PrimaCut" "Lat"
   
 sentsSwe =
   [-- "förstår vi då våra grannspråk",
@@ -56,10 +58,11 @@ sentsSwe =
    "om en norrman säger att han har inte någon anledning att gå på din fest , ska du inte bli ledsen"]
 
 testSwe =
-  do
-    pgf <- readPGF "data/test-corpus/sv/Rivstart.pgf"
-    writeFile "/tmp/cplex.lp" $ printConstraints (LP CPLEX) $ convertToSetProblem $ mkMultisetProblem pgf sentsSwe
-    runCPLEX "/tmp/cplex.lp" "Rivstart" "RivstartCut" "Swe"
+  runTest "data/test-corpus/sv/Rivstart.pgf" sentsSwe "Rivstart" "RivstartCut" "Swe"
+  -- do
+  --   pgf <- readPGF "data/test-corpus/sv/Rivstart.pgf"
+  --   writeFile "/tmp/cplex.lp" $ printConstraints (LP CPLEX) $ convertToSetProblem $ mkMultisetProblem pgf sentsSwe
+  --   runCPLEX "/tmp/cplex.lp" "Rivstart" "RivstartCut" "Swe"
 
 sentsEng =
   [ "I will not buy this record , it is scratched",
@@ -68,12 +71,28 @@ sentsEng =
   ]
 
 testEng =
-  do
-    pgf <- readPGF "data/test-corpus/en/Hungarian.pgf"
-    system "rm -f /tmp/cplex.lp"
-    writeFile "/tmp/cplex.lp" $ printConstraints (LP CPLEX) $ convertToSetProblem $ mkMultisetProblem pgf sentsEng
-    runCPLEX "/tmp/cplex.lp" "Hungarian" "HungarianCut" "Eng"
+  runTest "data/test-corpus/en/Hungarian.pgf" sentsEng "Hungarian" "HungarianCut" "Eng"
+  -- do
+  --   pgf <- readPGF "data/test-corpus/en/Hungarian.pgf"
+  --   system "rm -f /tmp/cplex.lp"
+  --   writeFile "/tmp/cplex.lp" $ printConstraints (LP CPLEX) $ convertToSetProblem $ mkMultisetProblem pgf sentsEng
+  --   runCPLEX "/tmp/cplex.lp" "Hungarian" "HungarianCut" "Eng"
 
+runTest :: String -> [String] -> String -> String -> String -> IO ()
+runTest pgfFile sentences grammarName restGrammarName lang =
+  do
+    putStrLn ">>> Read PGF"
+    pgf <- readPGF pgfFile
+    putStrLn ">>> Create problem (Step 1)"
+    let tmp = mkMultisetProblem pgf sentences
+    putStrLn ">>> Create problem (Step 2)"
+    let problem = convertToSetProblem $! tmp
+    putStrLn ">>> Create Probelm (Step 3)"
+    let cplex = printConstraints (LP CPLEX) problem
+    putStrLn ">>> Write file"
+    writeFile "/tmp/cplex.lp" cplex 
+    runCPLEX "/tmp/cplex.lp" grammarName restGrammarName lang
+    
 runCPLEX :: String -> String -> String -> String -> IO ()
 runCPLEX fn orig abs lang = 
   do
