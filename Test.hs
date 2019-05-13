@@ -30,18 +30,6 @@ sentsLat =
 
 testLat =
   runTest "data/test-corpus/la/Prima.pgf" sentsLat "Prima" "PrimaCut" "Lat"
-  -- do
-  --   putStrLn ">>> Read PGF"
-  --   pgf <- readPGF "data/test-corpus/la/Prima.pgf"
-  --   putStrLn ">>> Create problem (Step 1)"
-  --   let tmp = mkMultisetProblem pgf sentsLat
-  --   putStrLn ">>> Create problem (Step 2)"
-  --   let problem = convertToSetProblem tmp
-  --   putStrLn ">>> Create Probelm (Step 3)"
-  --   let cplex = printConstraints (LP CPLEX) problem
-  --   putStrLn ">>> Write file"
-  --   writeFile "/tmp/cplex.lp" cplex 
-  --   runCPLEX "/tmp/cplex.lp" "Prima" "PrimaCut" "Lat"
   
 sentsSwe =
   [-- "förstår vi då våra grannspråk",
@@ -59,10 +47,6 @@ sentsSwe =
 
 testSwe =
   runTest "data/test-corpus/sv/Rivstart.pgf" sentsSwe "Rivstart" "RivstartCut" "Swe"
-  -- do
-  --   pgf <- readPGF "data/test-corpus/sv/Rivstart.pgf"
-  --   writeFile "/tmp/cplex.lp" $ printConstraints (LP CPLEX) $ convertToSetProblem $ mkMultisetProblem pgf sentsSwe
-  --   runCPLEX "/tmp/cplex.lp" "Rivstart" "RivstartCut" "Swe"
 
 sentsEng =
   [ "I will not buy this record , it is scratched",
@@ -72,11 +56,6 @@ sentsEng =
 
 testEng =
   runTest "data/test-corpus/en/Hungarian.pgf" sentsEng "Hungarian" "HungarianCut" "Eng"
-  -- do
-  --   pgf <- readPGF "data/test-corpus/en/Hungarian.pgf"
-  --   system "rm -f /tmp/cplex.lp"
-  --   writeFile "/tmp/cplex.lp" $ printConstraints (LP CPLEX) $ convertToSetProblem $ mkMultisetProblem pgf sentsEng
-  --   runCPLEX "/tmp/cplex.lp" "Hungarian" "HungarianCut" "Eng"
 
 runTest :: String -> [String] -> String -> String -> String -> IO ()
 runTest pgfFile sentences grammarName restGrammarName lang =
@@ -88,85 +67,10 @@ runTest pgfFile sentences grammarName restGrammarName lang =
     putStrLn ">>> Create problem (Step 2)"
     let problem = convertToSetProblem $! tmp
     putStrLn ">>> Create Probelm (Step 3)"
-    let cplex = printConstraints (LP CPLEX) problem
-    putStrLn ">>> Write file"
-    writeFile "/tmp/cplex.lp" cplex 
-    runCPLEX "/tmp/cplex.lp" grammarName restGrammarName lang
-    
-runCPLEX :: String -> String -> String -> String -> IO ()
-runCPLEX fn orig abs lang = 
-  do
-    putStrLn "+++ Writing problem file..."
-    system "rm -f /tmp/cplex.in"
-    writeFile "/tmp/cplex.in" $ unlines $
-      [ "r " ++ fn
-      , "opt"
-      , "display solution variables *"
-      , "xecute rm -f /tmp/cplex.sol"
-      , "write /tmp/cplex.sol all"
-      , "quit"
-      ]
-    putStrLn "+++ Starting CPLEX..."
-    system $ cplex ++ " < /tmp/cplex.in" -- " > /tmp/cplex.out"
-    putStrLn "+++ Cleaning up solution..."
-    system "rm -f /tmp/cplex.var"
-    putStrLn "+++ Reading solution..."
-    s <- BS.readFile "/tmp/cplex.sol"
-    let rs = xmlToRules s
-    let a = "abstract " ++ abs ++ " = " ++ orig ++" ; "
-    writeFile (abs ++ ".gf") a
-    putStrLn a
-    mapM_ (\(ct,rs) -> do
-             let fn = abs ++ show ct ++ lang 
-             let c = unlines $ 
-                   [ "concrete " ++ fn ++ " of " ++ abs ++ " = Cat" ++ lang ++ ",Grammar" ++ lang ++ "[ListS,ListAP,ListNP] ** open (X=" ++ orig ++ lang ++ ") in {"
-                   , "  lin" ] ++
-                   [ "    " ++ read r ++ " = X." ++ read r ++ " ; " | r <- rs, isRule r] ++
-                   [ " } ; " ]
-             writeFile (fn ++ ".gf") c
-             putStrLn c
-         ) $ M.toList rs
+    let lp = printConstraints (LP CPLEX) problem
+    putStrLn ">>> Write CSP file"
+    grams <- runCPLEX cplex lp grammarName restGrammarName lang
 
-isRule :: String -> Bool
-isRule = not . isId
-  where
-    isId [] = True
-    isId ('s':is) = isId is
-    isId ('t':is) = isId is
-    isId (c  :is) | isDigit c = isId is
-    isId _  = False
-
-xmlToRules :: BS.ByteString -> M.Map Int [String]
-xmlToRules s =
-  saxToRules $ X.parse X.defaultParseOptions s
-  where
-    saxToRules :: [X.SAXEvent String String] -> M.Map Int [String]
-    saxToRules = findSolution
-    findSolution :: [X.SAXEvent String String] -> M.Map Int [String]
-    findSolution [] = M.empty
-    findSolution (X.StartElement "CPLEXSolution" _:es) =
-      findHeader es
-    findSolution (_:es) =
-      findSolution es
-    findHeader :: [X.SAXEvent String String] -> M.Map Int [String]
-    findHeader (X.StartElement "header" as:es)
-      | not $ elem ("solutionName","incumbent") as =
-        let
-          Just index = read <$> lookup "solutionIndex" as
-        in
-          findVariable index es
-      | otherwise = findSolution es
-    findHeader (_:es) =
-      findHeader  es
-    findVariable :: Int -> [X.SAXEvent String String] -> M.Map Int [String]
-    findVariable ct (X.StartElement "variable" as:es)
-      | elem ("value","1") as = 
-        let 
-          rs = findVariable ct es
-          Just v = lookup "name" as
-        in M.alter (Just . maybe [v] (v:)) ct rs
-      | otherwise = findVariable ct es
-    findVariable ct (X.EndElement "CPLEXSolution":es) =
-      findSolution es
-    findVariable ct (e:es) =
-      findVariable ct es
+    putStrLn ">>> Write grammar files"
+    mapM_ (uncurry writeFile) grams
+    putStrLn ">>> Finished"

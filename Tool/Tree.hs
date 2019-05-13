@@ -9,6 +9,11 @@ import SAT
 import SAT.Bool
 import System.IO.Unsafe (unsafePerformIO)
 import Control.Monad
+import qualified Text.XML.Expat.SAX as X
+import qualified Data.ByteString.Lazy as BS
+import System.Process( system )
+import System.IO.Temp
+import Data.Char
 
 -- Boolean operations 
 data SAT a = SVar a | Conj [SAT a] | Dis [SAT a] | Imp (SAT a) (SAT a)
@@ -267,3 +272,84 @@ satToMiniSat solv (prem@(Conj ps),cs) = do
 printModel :: Solver -> M.Map String Lit -> IO ()
 printModel s ls =
    putStrLn =<< (return . unlines) =<< sequence [fmap (((v ++ "\t") ++) . show) $ modelValue s l |  (v,l) <- M.toList ls]
+
+type Grammar = (FilePath,String) -- name of the grammar and file content
+-- | Function to run cplex on a LP problem
+runCPLEX :: FilePath -> String -> String -> String -> String -> IO ([Grammar])
+runCPLEX cplex lp orig abs lang = 
+  do
+    lpfile <- emptySystemTempFile "cplex.lp"
+    writeFile lpfile lp
+    putStrLn "+++ Writing problem file..."
+    infile <- emptySystemTempFile "cplex.in"
+    outfile <- emptySystemTempFile "cplex.sol"
+    writeFile infile $ unlines $
+      [ "r " ++ lpfile
+      , "opt"
+      , "display solution variables *"
+      , "xecute rm -f " ++ outfile
+      , "write " ++ outfile ++ " all"
+      , "quit"
+      ]
+    putStrLn "+++ Starting CPLEX..."
+    system $ cplex ++ " < " ++ infile -- " > /tmp/cplex.out"
+    putStrLn "+++ Reading solution..."
+    s <- BS.readFile outfile
+    let rs = xmlToRules s
+    let absgram = (abs ++ ".gf","abstract " ++ abs ++ " = " ++ orig ++" ; ")
+    let concgrams = map (\(ct,rs) -> 
+                           let fn = abs ++ show ct ++ lang 
+                           in (fn ++ ".gf", unlines $
+--                                   [ "concrete " ++ fn ++ " of " ++ abs ++ " = Cat" ++ lang ++ ",Grammar" ++ lang ++ "[ListS,ListAP,ListNP] ** open (X=" ++ orig ++ lang ++ ") in {"
+                                [ "concrete " ++ fn ++ " of " ++ abs ++ " = " ++ abs ++ "Inc ** open (X=" ++ orig ++ lang ++ ") in {"
+ 
+                                   , "  lin" ] ++
+                                [ "    " ++ read r ++ " = X." ++ read r ++ " ; " | r <- rs, isRule r] ++
+                                [ " } ; " ])
+                        ) $ M.toList rs
+    return (absgram:concgrams)
+    
+isRule :: String -> Bool
+isRule = not . isId
+  where
+    isId [] = True
+    isId ('s':is) = isId is
+    isId ('t':is) = isId is
+    isId (c  :is) | isDigit c = isId is
+    isId _  = False
+    
+-- | Function to parse a CPLEX solution from a XML file
+xmlToRules :: BS.ByteString -> M.Map Int [String]
+xmlToRules s =
+  saxToRules $ X.parse X.defaultParseOptions s
+  where
+    saxToRules :: [X.SAXEvent String String] -> M.Map Int [String]
+    saxToRules = findSolution
+    findSolution :: [X.SAXEvent String String] -> M.Map Int [String]
+    findSolution [] = M.empty
+    findSolution (X.StartElement "CPLEXSolution" _:es) =
+      findHeader es
+    findSolution (_:es) =
+      findSolution es
+    findHeader :: [X.SAXEvent String String] -> M.Map Int [String]
+    findHeader (X.StartElement "header" as:es)
+      | not $ elem ("solutionName","incumbent") as =
+        let
+          Just index = read <$> lookup "solutionIndex" as
+        in
+          findVariable index es
+      | otherwise = findSolution es
+    findHeader (_:es) =
+      findHeader  es
+    findVariable :: Int -> [X.SAXEvent String String] -> M.Map Int [String]
+    findVariable ct (X.StartElement "variable" as:es)
+      | elem ("value","1") as = 
+        let 
+          rs = findVariable ct es
+          Just v = lookup "name" as
+        in M.alter (Just . maybe [v] (v:)) ct rs
+      | otherwise = findVariable ct es
+    findVariable ct (X.EndElement "CPLEXSolution":es) =
+      findSolution es
+    findVariable ct (e:es) =
+      findVariable ct es
