@@ -147,15 +147,11 @@ printConstraints (LP CPLEX) cp =
     sentVars = map fst lts
     treeVars = map fst vars
     ruleVars = concatMap snd $ vars
-    ruleCounts = Prelude.foldl (\m k -> M.alter (maybe (Just 1) (\n -> Just (n + 1))) k m) M.empty $ ruleVars
-    ruleCount = length $ nub ruleVars
   in
     unlines $
-      [ "Minimize" ] ++
---      [ " obj: " ++ show (1/(fromIntegral .length $ sentVars)) ++ "(" ++ intercalate " + " treeVars ++ ")"] ++ -- average number of trees per sentence
---      [ " obj: " ++ intercalate " + " (map (\r -> (show $ (fromIntegral . floor) (ruleCounts M.! r / fromIntegral ruleCount * 100) / 100) ++ r) ruleVars) ++ " + " ++ intercalate " + " treeVars ] ++ -- weighted rules plus number of trees
-      [ " obj: \"" ++ intercalate "\" + \"" (nub ruleVars) ++ "\" + " ++ intercalate " + " (nub treeVars) ++ "" ] ++ -- number of trees plus number of rules
-      [ "Subject to"] ++ 
+--      (objNumTreesNumRules treeVars ruleVars) ++
+--      (objNumTreesWeightedNumRules treeVars ruleVars) ++
+      (objAvgNumTrees lts) ++
       [ " cs" ++ show i ++ ": " ++ intercalate " + " c ++ " >= 1" | (i,c) <- zip [0..] [map fst ts | (s,ts) <- lts]] ++
       [ " c" ++ show i ++ ": " ++ c | (i,c) <- zip [0..] [show (length rs) ++ "" ++ t ++ " - \"" ++ intercalate "\" - \"" rs ++ "\" <= 0" | (s,ts) <- lts, (t,rs) <- ts]] ++
       [ "Binary"] ++ 
@@ -353,3 +349,33 @@ xmlToRules s =
       findSolution es
     findVariable ct (e:es) =
       findVariable ct es
+
+-- Objective functions
+
+objAvgNumTrees :: [(String,[(String,[String])])] -> [String]
+objAvgNumTrees lts =
+  let
+    sts = [(s,map fst ts) | (s,ts) <- lts]
+    stcs = [(s,length ts) | (s,ts) <- sts]
+  in
+    [ "Minimize" ] ++
+    [ " obj : " ++ intercalate " + " [show (1 / fromIntegral c) ++ "sts" ++ show i | (i,(_,c)) <- zip [0..] stcs]] ++
+    [ "Subject to"] ++
+    [ " stc" ++ show i ++ ": " ++ intercalate " + " ts ++ " - sts" ++ show i ++ " = 0" | (i,(_,ts)) <- zip [0..] sts]
+--      [ " obj: " ++ show (1/(fromIntegral .length $ sentVars)) ++ "(" ++ intercalate " + " treeVars ++ ")"] ++ -- average number of trees per sentence
+objNumTreesWeightedNumRules :: [String] -> [String] -> [String]
+objNumTreesWeightedNumRules treeVars ruleVars =
+  let
+    ruleCounts = Prelude.foldl (\m k -> M.alter (maybe (Just 1) (\n -> Just (n + 1))) k m) M.empty $ ruleVars
+    ruleCount = length $ nub ruleVars
+  in
+    [ "Minimize" ] ++
+    [ " obj: " ++ intercalate " + " (map (\r -> (show $ (fromIntegral . floor) (ruleCounts M.! r / fromIntegral ruleCount * 100) / 100) ++ r) ruleVars) ++ " + " ++ intercalate " + " treeVars ] ++ -- weighted rules plus number of trees
+    [ "Subject to"]
+objNumTreesNumRules :: [String] -> [String] -> [String]
+objNumTreesNumRules treeVars ruleVars =
+  [ "Minimize" ] ++
+  [ " obj: \"" ++ intercalate "\" + \"" (nub ruleVars) ++ "\" + " ++ intercalate " + " (nub treeVars) ++ "" ] ++ -- number of trees plus number of rules
+  [ "Subject to"]
+
+-- [("s1",[("t11",[]),("t12",[]),("t13",[]),("t14",[])]),("s2",[("t21",[]),("t22",[])]),("s3",[("t31",[]),("t32",[]),("t33",[]),("t34",[]),("t35",[])]),("s4",[("t41",[])]),("s5",[("t51",[]),("t52",[]),("t53",[])])]
