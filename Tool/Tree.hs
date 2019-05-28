@@ -372,10 +372,22 @@ objNumTreesWeightedNumRules treeVars ruleVars =
     [ "Minimize" ] ++
     [ " obj: " ++ intercalate " + " (map (\r -> (show $ (fromIntegral . floor) (ruleCounts M.! r / fromIntegral ruleCount * 100) / 100) ++ r) ruleVars) ++ " + " ++ intercalate " + " treeVars ] ++ -- weighted rules plus number of trees
     [ "Subject to"]
+
+objNumTrees :: [String] -> [String] -> [String]
+objNumTrees treeVars ruleVars =
+  [ "Minimize" ] ++
+  [ " obj: \"" ++ intercalate " + " (nub treeVars) ++ "" ] ++ -- number of trees
+  [ "Subject to"]
+  
 objNumTreesNumRules :: [String] -> [String] -> [String]
 objNumTreesNumRules treeVars ruleVars =
   [ "Minimize" ] ++
   [ " obj: \"" ++ intercalate "\" + \"" (nub ruleVars) ++ "\" + " ++ intercalate " + " (nub treeVars) ++ "" ] ++ -- number of trees plus number of rules
   [ "Subject to"]
 
+objNumRules :: [String] -> [String] -> [String]
+objNumRules treeVars ruleVars =
+  [ "Minimize" ] ++
+  [ " obj: \"" ++ intercalate "\" + \"" (nub ruleVars) ++ "\"" ] ++ -- number of trees plus number of rules
+  [ "Subject to"]
 -- [("s1",[("t11",[]),("t12",[]),("t13",[]),("t14",[])]),("s2",[("t21",[]),("t22",[])]),("s3",[("t31",[]),("t32",[]),("t33",[]),("t34",[]),("t35",[])]),("s4",[("t41",[])]),("s5",[("t51",[]),("t52",[]),("t53",[])])]
