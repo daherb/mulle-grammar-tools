@@ -271,14 +271,13 @@ printModel :: Solver -> M.Map String Lit -> IO ()
 printModel s ls =
    putStrLn =<< (return . unlines) =<< sequence [fmap (((v ++ "\t") ++) . show) $ modelValue s l |  (v,l) <- M.toList ls]
 
-type Grammar = (FilePath,String) -- name of the grammar and file content
 -- | Function to run cplex on a LP problem
-runCPLEX :: FilePath -> String -> String -> String -> String -> IO ([Grammar])
-runCPLEX cplex lp orig abs lang = 
+runCPLEX :: FilePath -> String -> IO (M.Map Int (Float,[String]))
+runCPLEX cplex lp = 
   do
     lpfile <- emptySystemTempFile "cplex.lp"
     writeFile lpfile lp
-    putStrLn "+++ Writing problem file..."
+    putStrLn $ "+++ Writing problem file... " ++ lpfile
     infile <- emptySystemTempFile "cplex.in"
     outfile <- emptySystemTempFile "cplex.sol"
     writeFile infile $ unlines $
@@ -289,11 +288,12 @@ runCPLEX cplex lp orig abs lang =
       , "write " ++ outfile ++ " all"
       , "quit"
       ]
-    putStrLn "+++ Starting CPLEX..."
-    system $ cplex ++ " < " ++ infile -- " > /tmp/cplex.out"
-    putStrLn "+++ Reading solution..."
+    putStrLn $ "+++ Starting CPLEX... " ++ infile
+    system $ cplex ++ " < " ++ infile ++ " &> /tmp/cplex.out"
+    putStrLn $ "+++ Reading solution..." ++ outfile
     s <- BS.readFile outfile
-    let rs = xmlToRules s
+    return $ xmlToRules s
+
     let absgram = (abs ++ ".gf","abstract " ++ abs ++ " = " ++ orig ++" ; ")
     let concgrams = map (\(ct,rs) -> 
                            let fn = abs ++ show ct ++ lang 
