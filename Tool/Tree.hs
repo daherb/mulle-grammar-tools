@@ -311,44 +311,46 @@ isRule = not . isId
     isId [] = True
     isId ('s':is) = isId is
     isId ('t':is) = isId is
+    isId ('c':is) = isId is
     isId (c  :is) | isDigit c = isId is
     isId _  = False
     
 -- | Function to parse a CPLEX solution from a XML file
-xmlToRules :: BS.ByteString -> M.Map Int [String]
+xmlToRules :: BS.ByteString -> M.Map Int (Float,[String])
 xmlToRules s =
   saxToRules $ X.parse X.defaultParseOptions s
   where
-    saxToRules :: [X.SAXEvent String String] -> M.Map Int [String]
+    saxToRules :: [X.SAXEvent String String] -> M.Map Int (Float,[String])
     saxToRules = findSolution
-    findSolution :: [X.SAXEvent String String] -> M.Map Int [String]
+    findSolution :: [X.SAXEvent String String] -> M.Map Int (Float,[String])
     findSolution [] = M.empty
     findSolution (X.StartElement "CPLEXSolution" _:es) =
       findHeader es
     findSolution (_:es) =
       findSolution es
-    findHeader :: [X.SAXEvent String String] -> M.Map Int [String]
+    findHeader :: [X.SAXEvent String String] -> M.Map Int (Float,[String])
     findHeader (X.StartElement "header" as:es)
       | not $ elem ("solutionName","incumbent") as =
         let
           Just index = read <$> lookup "solutionIndex" as
+          Just obj = read <$> lookup "objectiveValue" as
         in
-          findVariable index es
+          findVariable (index,obj) es
       | otherwise = findSolution es
     findHeader (_:es) =
       findHeader  es
-    findVariable :: Int -> [X.SAXEvent String String] -> M.Map Int [String]
-    findVariable ct (X.StartElement "variable" as:es)
+    findVariable :: (Int,Float) -> [X.SAXEvent String String] -> M.Map Int (Float,[String])
+    findVariable (ct,obj) (X.StartElement "variable" as:es)
       | elem ("value","1") as = 
         let 
-          rs = findVariable ct es
+          rs = findVariable (ct,obj) es
           Just v = lookup "name" as
-        in M.alter (Just . maybe [v] (v:)) ct rs
-      | otherwise = findVariable ct es
-    findVariable ct (X.EndElement "CPLEXSolution":es) =
+        in if isRule v then M.alter (Just . maybe (obj,[v]) (\(o,l) -> (o,v:l))) ct rs else rs
+      | otherwise = findVariable (ct,obj) es
+    findVariable _ (X.EndElement "CPLEXSolution":es) =
       findSolution es
-    findVariable ct (e:es) =
-      findVariable ct es
+    findVariable p (e:es) =
+      findVariable p es
 
 -- Objective functions
 
