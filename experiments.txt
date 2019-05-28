@@ -1,0 +1,20 @@
+OBS: the objective function has to be changed in the source code by commenting out the unused ones, in file Tool/Tree.hs
+- Rebuild grammars:
+ - monolingual
+ simulate "path/to/csv" "nameOfObjectiveFunctionForCSV" maxDepth numberOfSamples largerGrammarPgf grammarToBeRebuildPgf
+ e.g.
+ ofs = ["numrules","numtrees","numtreesnumrules","numtreesweightednumrules"]
+ langs = ["Eng","Fin","Ger","Spa","Swe"]
+ [simluate "csv/" of d =<< (readPGF $ "pgfs/Lang" ++ l ++ ".pgf") =<< (readPGF $ "pgfs/Exemplum" ++ l ++ ".pgf") | l <- langs, d <- [5..10] , of <- ofs]
+ - multilingual
+   Todo: make a verions simulateMulti that calls restrictMultilingualGrammar instead of restrictGrammar
+- Compare treebank
+ Create grammar
+ - monolinual
+   compareTreebank1 "data/mini-corpus/sv/sv.txt" "data/mini-corpus/fi/MiniFinFin.pgf"
+ - multilingual
+   compareTreebankMulti1 "data/mini-corpus/sv/sv.txt" ("data/mini-corpus/fi/MiniFinFin.pgf" ,"MiniFin") ("data/mini-corpus/fi/MiniFinEng.pgf","MiniEng")
+ Compare result
+ r <- compareTreebank2 "data/mini-corpus/de/de.txt" "data/mini-corpus/de/MiniCut1.pgf" "MiniCut1Ger
+ -- show if the tree was included
+ map (\(a,_,_) -> a) r
