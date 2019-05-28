@@ -294,8 +294,14 @@ runCPLEX cplex lp =
     s <- BS.readFile outfile
     return $ xmlToRules s
 
+type Grammar = (FilePath,String) -- name of the grammar and file content
+
+-- | Function to create GF grammars as strings from the results of CPLEX
+createGrammars :: String -> String -> String -> M.Map Int (Float,[String]) -> IO ([Grammar])
+createGrammars orig abs lang rs =
+  do
     let absgram = (abs ++ ".gf","abstract " ++ abs ++ " = " ++ orig ++" ; ")
-    let concgrams = map (\(ct,rs) -> 
+    let concgrams = map (\(ct,(obj,rs)) -> 
                            let fn = abs ++ show ct ++ lang 
                            in (fn ++ ".gf", unlines $
 --                                   [ "concrete " ++ fn ++ " of " ++ abs ++ " = Cat" ++ lang ++ ",Grammar" ++ lang ++ "[ListS,ListAP,ListNP] ** open (X=" ++ orig ++ lang ++ ") in {"
