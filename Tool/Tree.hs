@@ -149,9 +149,11 @@ printConstraints (LP CPLEX) cp =
     ruleVars = concatMap snd $ vars
   in
     unlines $
+--    (objAvgNumTrees lts) ++
+--      (objNumRules treeVars ruleVars) ++
+--      (objNumTrees treeVars ruleVars) ++
 --      (objNumTreesNumRules treeVars ruleVars) ++
---      (objNumTreesWeightedNumRules treeVars ruleVars) ++
-      (objAvgNumTrees lts) ++
+      (objNumTreesWeightedNumRules treeVars ruleVars) ++
       [ " cs" ++ show i ++ ": " ++ intercalate " + " c ++ " >= 1" | (i,c) <- zip [0..] [map fst ts | (s,ts) <- lts]] ++
       [ " c" ++ show i ++ ": " ++ c | (i,c) <- zip [0..] [show (length rs) ++ "" ++ t ++ " - \"" ++ intercalate "\" - \"" rs ++ "\" <= 0" | (s,ts) <- lts, (t,rs) <- ts]] ++
       [ "Binary"] ++ 
