@@ -314,7 +314,7 @@ createGrammars orig abs lang rs =
                            let fn = abs ++ show ct ++ lang 
                            in (fn ++ ".gf", unlines $
 --                                   [ "concrete " ++ fn ++ " of " ++ abs ++ " = Cat" ++ lang ++ ",Grammar" ++ lang ++ "[ListS,ListAP,ListNP] ** open (X=" ++ orig ++ lang ++ ") in {"
-                                [ "concrete " ++ fn ++ " of " ++ abs ++ " = " ++ abs ++ "Inc ** open (X=" ++ orig ++ lang ++ ") in {"
+                                [ "concrete " ++ fn ++ " of " ++ abs ++ " = " ++ lang ++ "Car ** open (X=" ++ lang ++ ") in {"
  
                                    , "  lin" ] ++
                                 [ "    " ++ read r ++ " = X." ++ read r ++ " ; " | r <- rs, isRule r] ++

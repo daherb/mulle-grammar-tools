@@ -14,6 +14,9 @@ OBS: the objective function has to be changed in the source code by commenting o
    compareTreebank1 "data/mini-corpus/sv/sv.txt" "data/mini-corpus/fi/MiniFinFin.pgf"
  - multilingual
    compareTreebankMulti1 "data/mini-corpus/sv/sv.txt" ("data/mini-corpus/fi/MiniFinFin.pgf" ,"MiniFin") ("data/mini-corpus/fi/MiniFinEng.pgf","MiniEng")
+ the result will be written to MiniCutXMiniLANG.gf in /tmp (where X is the number of the solution and LANG is the language code) which has to be fixed manually:
+ - rename to MiniCutXMiniLang.gf to MiniCutXLang.gf and change name in file as well
+ - change MiniMiniLANG to MiniLANG
  Compare result
  r <- compareTreebank2 "data/mini-corpus/de/de.txt" "data/mini-corpus/de/MiniCut1.pgf" "MiniCut1Ger
  -- show if the tree was included
