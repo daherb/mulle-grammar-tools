@@ -58,6 +58,15 @@ mkMultisetProblem pgf sents =
   in
     CP rules funSets
 
+mkMultilingMultisetProblem :: (PGF,Language) -> (PGF,Language) -> [(String,String)] -> ConstraintProblem String
+mkMultilingMultisetProblem (pgf1,l1) (pgf2,l2) sents =
+  let
+    rules = [showCId r | r <- functions pgf1] `intersect` [showCId r | r <- functions pgf2]
+    treeSets = let tts = [(sentenceTrees pgf1 l1 s1,sentenceTrees pgf2 l2 s2) |(s1,s2) <- sents] in [ intersect f s | (f,s) <- tts]
+    funSets = (map . map) (map showCId . treeFunctions) treeSets
+  in
+    CP rules funSets
+    
 -- | Function to convert the lists of syntax rules from multi-sets to sets
 convertToSetProblem :: Eq a => ConstraintProblem a -> ConstraintProblem a
 convertToSetProblem (CP rules trees) = CP rules $ (map . map) nub trees
