@@ -53,7 +53,7 @@ mkMultisetProblem :: PGF -> [String] -> ConstraintProblem String
 mkMultisetProblem pgf sents =
   let
     rules = [showCId r | r <- functions pgf]
-    treeSets = map (sentenceTrees pgf) sents
+    treeSets = map (sentenceTrees pgf (head $ languages pgf)) sents
     funSets = (map . map) (map showCId . treeFunctions) treeSets
   in
     CP rules funSets
@@ -74,9 +74,9 @@ convertToLabeledProblem (CP _ trees) =
   --     splitAts (map length ll) (zip [l ++ show i | i <- [0..]] (concat ll))
 
 -- | Function to parse a sentence to a list of trees using a PGF grammar
-sentenceTrees :: PGF -> String -> [Tree]
-sentenceTrees pgf sent =
-  parse pgf (head $ languages pgf) (startCat pgf) sent
+sentenceTrees :: PGF -> Language -> String -> [Tree]
+sentenceTrees pgf lang sent =
+  parse pgf lang (startCat pgf) sent
 
 -- | Function to convert a tree to a list of syntactic functions
 treeFunctions :: Tree -> [CId]
