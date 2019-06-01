@@ -16,7 +16,8 @@ extra-source-files:  ChangeLog.md
 cabal-version:       >=1.10
 
 library
-  exposed-modules:     Tool.Tree, Test, Simulation
+  exposed-modules:     Tool.Tree, Simulation
+  -- , Test
                   -- , Tool.Lexicon
   -- other-modules:
 --  other-extensions:    DeriveGeneric, OverloadedStrings
