@@ -21,3 +21,11 @@ OBS: the objective function has to be changed in the source code by commenting o
  r <- compareTreebank2 "data/mini-corpus/de/de.txt" "data/mini-corpus/de/MiniCut1.pgf" "MiniCut1Ger
  -- show if the tree was included
  map (\(a,_,_) -> a) r
+ ff <- readFile "data/mini-corpus/de/de.txt"
+ let rr = read ff :: [(String,String,String)]
+ let ss = [(s1,s2) | (s1,s2,_) <- rr]
+ let ls = map (\(_,_,ts) -> length ts) r in (sum ls)
+ let ts = [sentenceTrees pgf1 (fromJust $ readLanguage "MiniSwe") s1 |(s1,_) <- ss]
+ let ts = [(sentenceTrees pgf1 l1 s1,sentenceTrees pgf2 l2 s2) |(s1,s2) <- ss]
+ -- check if some parse failed
+ filter (\(_,_,c) -> null c) r
