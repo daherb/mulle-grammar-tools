@@ -147,8 +147,8 @@ compareTrees old new =
 -- | Function to compare two grammars and compute precision and recall
 --
 -- The formulas used are:
--- \[precision = \frac{|relevant\_functions\cup retrieved\_functions|}{|retrieved\_functions|}\]
--- \[recall = \frac{|relevant\_functions\cup retrieved\_functions|}{|relevant\_functions|}\]
+-- \[precision = \frac{|relevant\_functions\cap retrieved\_functions|}{|retrieved\_functions|}\]
+-- \[recall = \frac{|relevant\_functions\cap retrieved\_functions|}{|relevant\_functions|}\]
 -- where relevant_functions depends on the restricted pgf and relevant_functions depends on the list of syntactic rules given
 compareGrammar
   :: PGF            -- ^ the full pgf
