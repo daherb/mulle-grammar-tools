@@ -167,6 +167,49 @@ compareGrammar fpgf pgf funs =
   in
     (precision,recall)
 
-filterLexical :: PGF -> [String] -> [String]
+-- | Function to remove lexical rules, i.e. constant functions, from a set of syntax rules
+filterConstant
+  :: PGF -> [String] -> [String]
+filterConstant pgf rs =
+  [ f | (f,t) <- zip rs $ map (\c -> unType <$> (functionType pgf =<< readCId c)) rs, -- extract the type
+        isJust t,             -- check that the type has an actual value
+        let Just (h,_,_) = t, -- extract function type -> l is the "hypothesis", i.e. the argument types
+        (not . null) h        -- filter out types that do not have arguments
+  ]
+
+-- | Function to remove lexical rules, i.e. of lexical categories, from a set of syntax rules
+filterLexical
+  :: PGF -> [String] -> [String]
 filterLexical pgf rs =
-  [ f | (f,t) <- zip rs $ map (\c -> unType <$> (functionType pgf =<< readCId c)) rs, isJust t, let Just (l,_,_) = t, (not . null) l]
+  [ f | (f,t) <- zip rs $ map (\c -> unType <$> (functionType pgf =<< readCId c)) rs, -- extract the type
+        isJust t,             -- check that the type has an actual value
+        let Just (h,c,_) = t, -- extract function type -> l is the "hypothesis", i.e. the argument types
+        let s = showCId c,    -- convert category to string
+        not (s `elem` cats)   -- filter out types that do not have arguments
+  ]
+  where
+    cats = ["A",       -- one-place adjective
+            "A2",      -- two-place adjective
+            "ACard",   -- adjective like cardinal
+            "AdA",     -- adjective-modifying adverb
+            "AdN",     -- numeral-modifying adverb
+            "AdV",     -- adverb directly attached to verb
+            "Adv",     -- verb-phrase-modifying adverb
+            "DAP",     -- determiner with adjective
+            "Interj",  -- interjection
+            "N",       -- common noun
+            "N2",      -- relational noun
+            "N3",      -- three-place relational noun
+            "PN",      -- proper name
+            "V",       -- one-place verb
+            "V2",      -- two-place verb
+            "V2A",     -- verb with NP and AP complement
+            "V2Q",     -- verb with NP and Q complement
+            "V2S",     -- verb with NP and S complement
+            "V2V",     -- verb with NP and V complement
+            "V3",      -- three-place verb
+            "VA",      -- adjective-complement verb
+            "VQ",      -- question-complement verb
+            "VS",      -- sentence-complement verb
+            "VV"       -- verb-phrase-complement verb
+           ]
