@@ -13,25 +13,52 @@ import Data.Maybe
 import Data.Time.Clock.System
 import Debug.Trace
 
+-- | The hardcoded path to the cplex executable
 cplex = "/home/herb/opt/cplex/cplex/bin/x86-64_linux/cplex"
+
 --grammarPath = "/home/herb/src/own/mulle-grammar-tool/data/mini-"
+
+-- | The path to the temp directory
 tmpPath = "/tmp/"
 
-generateTrees :: PGF -> Int -> Int -> IO [Tree]
+-- | Function to generate a number of random trees of a certain depth
+generateTrees
+  :: PGF             -- ^ the grammar file to be used
+  -> Int             -- ^ the depth of the trees
+  -> Int             -- ^ the number of trees to be created 
+  -> IO [Tree]       -- ^ a list of trees
 generateTrees pgf depth ct =
   do
     g <- mkStdGen <$> (\s -> fromIntegral (systemSeconds s) + fromIntegral (systemNanoseconds s)) <$> getSystemTime 
     return $ take ct $ generateRandomDepth g pgf (startCat pgf) (Just depth)
 
-generateTrees' :: StdGen -> PGF -> Int -> Int -> IO [Tree]
-generateTrees' g pgf depth ct =
+-- | Function to generate a number of random trees of a certain depth given a 'StdGen' generator
+generateTreesWithGen
+  :: StdGen          -- ^ the random generator to be used
+  -> PGF             -- ^ the grammar file to be used
+  -> Int             -- ^ the depth of the trees
+  -> Int             -- ^ the number of trees to be created 
+  -> IO [Tree]       -- ^ a list of trees
+generateTreesWithGen g pgf depth ct =
   do
     return $ take ct $ generateRandomDepth g pgf (startCat pgf) (Just depth)
-linearizeTrees :: PGF -> [Tree] -> [String]
+
+-- | Function to linearize a list of trees
+linearizeTrees
+  :: PGF             -- ^ the grammar file to be used
+  -> [Tree]          -- ^ a list of trees
+  -> [String]        -- ^ a list of sentences
 linearizeTrees pgf =
   map (linearize pgf (head $ languages pgf)) 
 
-restrictGrammar :: PGF -> [String] -> IO (M.Map Int (Float,[String]))
+-- | Function to transform a 'PGF' grammar into an restricted representation using a list of example sentences.
+--   
+--   The result is a representation of one or several grammars containing the objective value and the list of
+--   syntax rules.
+restrictGrammar
+  :: PGF                             -- ^ the grammar file to be restricted
+  -> [String]                        -- ^ a list of example sentences
+  -> IO (M.Map Int (Float,[String])) -- ^ the resulting grammars, i.e. lists of syntax rules
 restrictGrammar pgf sentences =
   do
     putStrLn ">>> Create problem"
@@ -42,7 +69,18 @@ restrictGrammar pgf sentences =
     putStrLn ">>> Write CSP file"
     runCPLEX cplex lp
 
-restrictMultilingualGrammar :: (PGF,Language) -> (PGF,Language) -> [(String,String)] -> IO (M.Map Int (Float,[String]))
+-- | Function to transform a 'PGF' grammar into an restricted representation using a list of example sentences.
+--
+--   To restrict the grammar two languages and bilingual examples are used by restricting the syntax trees to
+--   the interesction of the sets of syntax trees for both languages
+--   
+--   The result is a representation of one or several grammars containing the objective value and the list of
+--   syntax rules.
+restrictMultilingualGrammar
+  :: (PGF,Language)                  -- ^ the first language, i.e. pgf and language name
+  -> (PGF,Language)                  -- ^ the second language, i.e. pgf and language name
+  -> [(String,String)]               -- ^ list of pairs of examples
+  -> IO (M.Map Int (Float,[String])) -- ^ the resulting grammars, i.e. lists of syntax rules
 restrictMultilingualGrammar (pgf1,lang1) (pgf2,lang2) sentences =
   do
     putStrLn ">>> Create problem"
@@ -53,7 +91,12 @@ restrictMultilingualGrammar (pgf1,lang1) (pgf2,lang2) sentences =
     putStrLn ">>> Write CSP file"
     runCPLEX cplex lp
 
-writeGrammar :: PGF -> FilePath -> M.Map Int (Float,[String]) -> IO [FilePath]
+-- | Function to write a grammar represented by lists of syntax rules to GF syntax files
+writeGrammar
+  :: PGF                        -- ^ original pgf
+  -> FilePath                   -- ^ output path
+  -> M.Map Int (Float,[String]) -- ^ representation of the restricted grammars
+  -> IO [FilePath]              -- ^ list of files written
 writeGrammar pgf grammarPath rg = 
   do
     let absname = (showLanguage $ abstractName pgf)
@@ -63,7 +106,10 @@ writeGrammar pgf grammarPath rg =
     mapM_ (uncurry writeFile) grams'
     return $ map fst grams'
 
-compileGrammar :: [FilePath] -> IO FilePath
+-- | Function to compile a GF grammar to a PGF file
+compileGrammar
+  :: [FilePath]  -- ^ list of GF syntax files
+  -> IO FilePath -- ^ path to compiled PGF file
 compileGrammar fp =
   do
     tf <- emptySystemTempFile "mulle.pgf"
@@ -72,11 +118,25 @@ compileGrammar fp =
     system $ "gf --make -n " ++ tn ++ " -D " ++ tp ++ " " ++ unwords fp
     return tf
 
-parseSentences :: PGF -> Language -> [String] -> [[Tree]]
+-- | Function to parse a sentence in a given language
+parseSentences
+  :: PGF       -- ^ the grammar
+  -> Language  -- ^ the name of the language
+  -> [String]  -- ^ the list of sentences
+  -> [[Tree]]  -- ^ The list of all syntax trees for all the sentences
 parseSentences pgf lang =
   map (parse pgf lang (startCat pgf))
 
-compareTrees :: [Tree] -> [[Tree]] -> IO ()
+-- | Function to check if a each tree in a list of trees is contained in a separate list of trees, i.e.
+-- 
+--   with
+--   \[T=[t_1,\dots,t_n]\] and \[T'=[T'_1,\dots,t_n]\]
+--   \[\Downarrow\]
+--   \[[t_1\in T'_1,\dots,t_n\in T'_n]\]
+compareTrees
+  :: [Tree]     -- ^ the list of trees that should be contained
+  -> [[Tree]]   -- ^ lists of lists of trees to compare with
+  -> IO () 
 compareTrees old new =
   let pos = length $ takeWhile (uncurry elem) $ zip old new
   in
@@ -84,15 +144,28 @@ compareTrees old new =
     else
       putStrLn $ "Missmatch after " ++ show pos ++ "trees"
 
-compareGrammar :: PGF -> PGF -> [String] -> (Float,Float)
+-- | Function to compare two grammars and compute precision and recall
+--
+-- The formulas used are:
+-- \[precision = \frac{|relevant\_functions\cup retrieved\_functions|}{|retrieved\_functions|}\]
+-- \[recall = \frac{|relevant\_functions\cup retrieved\_functions|}{|relevant\_functions|}\]
+-- where relevant_functions depends on the restricted pgf and relevant_functions depends on the list of syntactic rules given
+compareGrammar
+  :: PGF            -- ^ the full pgf
+  -> PGF            -- ^ a restricted version of the grammar, defines relevant_functions
+  -> [String]       -- ^ a list of syntax rules to be compared to the restricted grammar, defined retrieved_functions
+  -> (Float,Float)  -- ^ Precision and Recall
 compareGrammar fpgf pgf funs =
   let
+    -- compute retrieved functions
     retfuns = filterLexical fpgf funs
+    -- compute relevant functions
     relfuns = filterLexical fpgf $ map showCId $ functions pgf
+    -- compute precision and recall
     precision = (fromIntegral . length) (relfuns `intersect` retfuns) / (fromIntegral . length) retfuns
     recall = (fromIntegral . length) (relfuns `intersect` retfuns) / (fromIntegral . length) relfuns
   in
-    trace (unlines [ "<<< computing precission/recall", show $ sort funs, show $ sort $ map showCId $ functions pgf, show $ sort retfuns, show $ sort relfuns, show $ sort (relfuns `intersect` retfuns)]) (precision,recall)
+    (precision,recall)
 
 filterLexical :: PGF -> [String] -> [String]
 filterLexical pgf rs =
