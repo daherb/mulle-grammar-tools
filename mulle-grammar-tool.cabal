@@ -16,7 +16,7 @@ extra-source-files:  ChangeLog.md
 cabal-version:       >=1.10
 
 library
-  exposed-modules:     Tool.Tree, Simulation
+  exposed-modules:     Tool.Tree, Simulation, Inference
   -- , Test
                   -- , Tool.Lexicon
   -- other-modules:
