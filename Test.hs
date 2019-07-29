@@ -69,8 +69,30 @@ runTest pgfFile sentences grammarName restGrammarName lang =
     putStrLn ">>> Create Probelm (Step 3)"
     let lp = printConstraints (LP CPLEX) problem
     putStrLn ">>> Write CSP file"
-    grams <- runCPLEX cplex lp grammarName restGrammarName lang
-
+    grams <- createGrammars grammarName restGrammarName lang =<< runCPLEX cplex lp 
     putStrLn ">>> Write grammar files"
     mapM_ (uncurry writeFile) grams
     putStrLn ">>> Finished"
+
+-- multiSent = [("I eat bread", "minä syön leipää", "PhrUtt NoPConj (UttS (UseCl (TTAnt TPres ASimul) PPos (PredVP (UsePron i_Pron) (ComplV2 eat_V2 (MassNP (UseN bread_N)))))) NoVoc"),
+-- ("I don't eat bread", "minä en syö leipää", "PhrUtt NoPConj (UttS (UseCl (TTAnt TPres ASimul) PNeg (PredVP (UsePron i_Pron) (ComplV2 eat_V2 (MassNP (UseN bread_N)))))) NoVoc"),
+-- ("eat bread", "syö leipää", "PhrUtt NoPConj (UttImpSg PPos (ImpVP (ComplSlash (SlashV2a eat_V2) (MassNP (UseN bread_N))))) NoVoc"),
+-- ("eat bread", "syökää leipää", "PhrUtt NoPConj (UttImpPl PPos (ImpVP (ComplSlash (SlashV2a eat_V2) (MassNP (UseN bread_N))))) NoVoc"),
+-- ("don't eat bread", "älä syö leipää", "PhrUtt NoPConj (UttImpSg PNeg (ImpVP (AdvVP (PassV2 eat_V2) (PrepNP part_Prep (MassNP (UseN bread_N)))))) NoVoc"),
+-- ("don't eat bread", "älkää syökö leipää", "PhrUtt NoPConj (UttImpPl PNeg (ImpVP (ComplSlash (SlashV2a eat_V2) (MassNP (UseN bread_N))))) NoVoc"),
+-- ("I sing a song", "minä laulan laulun", "PhrUtt NoPConj (UttS (UseCl (TTAnt TPres ASimul) PPos (PredVP (UsePron i_Pron) (ComplSlash (SlashV2a sing_V2) (DetCN (DetQuant IndefArt NumSg) (UseN song_N)))))) NoVoc"),
+-- ("I don't sing a song", "minä en laula laulua", "PhrUtt NoPConj (UttS (UseCl (TTAnt TPres ASimul) PNeg (PredVP (UsePron i_Pron) (ComplSlash (SlashV2a sing_V2) (DetCN (DetQuant IndefArt NumSg) (UseN song_N)))))) NoVoc"),
+-- ("sing a song", "laula laulu", "PhrUtt NoPConj (UttImpSg PPos (ImpVP (ComplSlash (SlashV2a sing_V2) (DetCN (DetQuant IndefArt NumSg) (UseN song_N))))) NoVoc"),
+-- ("sing a song", "laulakaa laulu", "PhrUtt NoPConj (UttImpPl PPos (ImpVP (ComplSlash (SlashV2a sing_V2) (DetCN (DetQuant IndefArt NumSg) (UseN song_N))))) NoVoc"),
+-- ("don't sing a song", "älä laula laulua", "PhrUtt NoPConj (UttImpSg PNeg (ImpVP (ComplSlash (SlashV2a sing_V2) (DetCN (DetQuant IndefArt NumSg) (UseN song_N))))) NoVoc"),
+-- ("don't sing a song", "älkää laulako laulua", "PhrUtt NoPConj (UttImpPl PNeg (ImpVP (ComplSlash (SlashV2a sing_V2) (DetCN (DetQuant IndefArt NumSg) (UseN song_N))))) NoVoc"),
+-- ("I want to eat bread", "minä haluan syödä leipää", "PhrUtt NoPConj (UttS (UseCl (TTAnt TPres ASimul) PPos (PredVP (UsePron i_Pron) (ComplVV want_2_VV (ComplSlash (SlashV2a eat_V2) (MassNP (UseN bread_N))))))) NoVoc"),
+-- ("I don't want to eat bread", "minä en halua syödä leipää", "PhrUtt NoPConj (UttS (UseCl (TTAnt TPres ASimul) PNeg (PredVP (UsePron i_Pron) (ComplVV want_2_VV (ComplSlash (SlashV2a eat_V2) (MassNP (UseN bread_N))))))) NoVoc"),
+-- ("I want to sing a song in the shower", "minä haluan laulaa laulun suihkussa", "PhrUtt NoPConj (UttS (UseCl (TTAnt TPres ASimul) PPos (PredVP (UsePron i_Pron) (ComplVV want_2_VV (AdvVP (ComplSlash (SlashV2a sing_V2) (DetCN (DetQuant IndefArt NumSg) (UseN song_N))) (PrepNP in_Prep (DetCN (DetQuant DefArt NumSg) (UseN shower_N)))))))) NoVoc"),
+-- ("I don't want to sing a song in the shower", "minä en halua laulaa laulua suihkussa", "PhrUtt NoPConj (UttS (UseCl (TTAnt TPres ASimul) PNeg (PredVP (UsePron i_Pron) (ComplVV want_2_VV (AdvVP (ComplSlash (SlashV2a sing_V2) (DetCN (DetQuant IndefArt NumSg) (UseN song_N))) (PrepNP in_Prep (DetCN (DetQuant DefArt NumSg) (UseN shower_N)))))))) NoVoc"),
+-- ("I have to eat bread", "minun täytyy syödä leipää", "PhrUtt NoPConj (UttS (UseCl (TTAnt TPres ASimul) PPos (PredVP (UsePron i_Pron) (ComplVV must_VV (ComplSlash (SlashV2a eat_V2) (MassNP (UseN bread_N))))))) NoVoc"),
+-- ("I don't have to eat bread", "minun ei täydy syödä leipää", "PhrUtt NoPConj (UttS (UseCl (TTAnt TPres ASimul) PNeg (PredVP (UsePron i_Pron) (ComplVV must_VV (ComplSlash (SlashV2a eat_V2) (MassNP (UseN bread_N))))))) NoVoc"),
+-- ("I have to sing a song", "minun täytyy laulaa laulu", "PhrUtt NoPConj (UttS (UseCl (TTAnt TPres ASimul) PPos (PredVP (UsePron i_Pron) (ComplVV must_VV (ComplSlash (SlashV2a sing_V2) (DetCN (DetQuant IndefArt NumSg) (UseN song_N))))))) NoVoc"),
+-- ("I don't have to sing a song", "minun ei täydy laulaa laulua", "PhrUtt NoPConj (UttS (UseCl (TTAnt TPres ASimul) PNeg (PredVP (UsePron i_Pron) (ComplVV must_VV (ComplSlash (SlashV2a sing_V2) (DetCN (DetQuant IndefArt NumSg) (UseN song_N))))))) NoVoc"),
+-- ("I eat bread in the kitchen", "minä syön leipää keittiössä ", "PhrUtt NoPConj (UttS (UseCl (TTAnt TPres ASimul) PPos (PredVP (UsePron i_Pron) (AdvVP (ComplSlash (SlashV2a eat_V2) (MassNP (UseN bread_N))) (PrepNP in_Prep (DetCN (DetQuant DefArt NumSg) (UseN kitchen_N))))))) NoVoc"),
+-- ("I don't eat bread in the kitchen ", "mina en syö leipää keittiössä", "PhrUtt NoPConj (UttS (UseCl (TTAnt TPres ASimul) PNeg (PredVP (UsePron i_Pron) (AdvVP (ComplSlash (SlashV2a eat_V2) (MassNP (UseN bread_N))) (PrepNP in_Prep (DetCN (DetQuant DefArt NumSg) (UseN kitchen_N))))))) NoVoc")]
