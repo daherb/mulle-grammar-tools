@@ -1,4 +1,44 @@
-module Tool.Tree where
+module Tool.Tree
+  (
+  -- * Data types
+  SAT(..),
+  LPFormat(..),
+  ConstraintFormat(..),
+  Rules(..),
+  TreeRules(..),
+  SentenceTrees(..),
+  ConstraintProblem(..),
+  LabeledConstraintProblem(..),
+  -- * Constraint problems
+  mkMultisetProblem,
+  mkMultilingMultisetProblem,
+  convertToSetProblem,
+  convertToLabeledProblem,
+  printConstraints,
+  -- * Tree functions
+  sentenceTrees,
+  treeFunctions,
+  -- * Grammar functions
+  createGrammars,
+  isRule,
+  -- * MiniSat
+  convertToMiniSat,
+  solveSat,
+  satToMiniSat,
+  printModel,
+  -- * CPLEX
+  runCPLEX,
+  xmlToRules,
+  -- * Objective functions
+  objAvgNumTrees,
+  objNumTreesWeightedNumRules,
+  objNumTrees,
+  objNumRules,
+  -- * Other functions
+  funCounts,
+  clean
+  )
+where
 
 import PGF
 import PGF.Internal
@@ -15,12 +55,13 @@ import System.Process( system )
 import System.IO.Temp
 import Data.Char
 
--- Boolean operations 
+-- | Data type for boolean operations, i.e. encoding SAT
 data SAT a = SVar a | Conj [SAT a] | Dis [SAT a] | Imp (SAT a) (SAT a)
 
--- Ways to generate LP formats
+-- | Data type for LP formats
 data LPFormat = LPSolve | CPLEX ;
-data ConstraintFormat = AMPL | LP LPFormat ; -- | MPS String ;
+-- | Data type for Constraint formats
+data ConstraintFormat = AMPL | LP LPFormat ; -- MPS String ;
 
 -- | A list of rule names
 type Rules a = [a]
@@ -29,18 +70,19 @@ type TreeRules a = [Rules a]
 -- | A list of sentences, i.e .a list of a list of rule names
 type SentenceTrees a = [TreeRules a]
 
+-- | Data type for a constraint problem
 -- Simple way to model our problem:
 -- It has the following components:
--- - A grammar has a set of rules
--- - For a set of sentences we can get the for each sentence a list of trees
--- - Each tree is a list of syntax rules
+-- * A grammar has a set of rules
+-- * For a set of sentences we can get the for each sentence a list of trees
+-- * Each tree is a list of syntax rules
 -- The list of syntax rules can be a set or a multiset, i.e. contain elements repeatedly
 data ConstraintProblem a = CP { rules :: Rules a, trees :: SentenceTrees a } deriving Show;
 
--- Same a above but labeled on sentence and tree level
+-- | Data type for alternate version of a constraint problem. Same a above but labeled on sentence and tree level
 data LabeledConstraintProblem a = LCP { ltrees :: [(String,[(String,[a])])] } deriving Show ;
 
--- Make SAT show-able
+-- | Make SAT show-able
 instance Show a => Show (SAT a) where
   show (SVar a) = show a
   show (Conj ts) = "(" ++ intercalate " /\\ " (map show ts) ++ ")"
@@ -48,7 +90,7 @@ instance Show a => Show (SAT a) where
   show (Imp p c) = show p ++ " => " ++ show c ++ "\n"
 
 -- | Function to create a constraint problem based on a PGF grammar and a list of (positive)
--- | example sentences
+--   example sentences
 mkMultisetProblem :: PGF -> [String] -> ConstraintProblem String
 mkMultisetProblem pgf sents =
   let
@@ -58,6 +100,8 @@ mkMultisetProblem pgf sents =
   in
     CP rules funSets
 
+-- | Function to create a contraint problem based on two PGF grammar in different languages
+--   and a list of bilingual example sentences
 mkMultilingMultisetProblem :: (PGF,Language) -> (PGF,Language) -> [(String,String)] -> ConstraintProblem String
 mkMultilingMultisetProblem (pgf1,l1) (pgf2,l2) sents =
   let
@@ -72,7 +116,8 @@ convertToSetProblem :: Eq a => ConstraintProblem a -> ConstraintProblem a
 convertToSetProblem (CP rules trees) = CP rules $ (map . map) nub trees
 
 -- | Function to add labels to a constraint problem. The labels have the shape
--- | s0..sn and t0..tm and can be used as variables in the constraint solving
+--   \[s_0\dots s_n\] for sentences and \[t_0\dots t_m\] for trees and can be
+--   used as variables in the constraint solving
 convertToLabeledProblem :: ConstraintProblem a -> LabeledConstraintProblem a
 convertToLabeledProblem (CP _ trees) =
   (LCP [("s" ++ show si,[("s" ++ show si ++ "t" ++ show ti,rs) | (ti,rs) <- zip [0..] ts]) | (si,ts) <- zip [0..] trees])
@@ -161,8 +206,8 @@ printConstraints (LP CPLEX) cp =
 --    (objAvgNumTrees lts) ++
 --      (objNumRules treeVars ruleVars) ++
 --      (objNumTrees treeVars ruleVars) ++
---      (objNumTreesNumRules treeVars ruleVars) ++
-      (objNumTreesWeightedNumRules treeVars ruleVars) ++
+      (objNumTreesNumRules treeVars ruleVars) ++
+--      (objNumTreesWeightedNumRules treeVars ruleVars) ++
       [ " cs" ++ show i ++ ": " ++ intercalate " + " c ++ " >= 1" | (i,c) <- zip [0..] [map fst ts | (s,ts) <- lts]] ++
       [ " c" ++ show i ++ ": " ++ c | (i,c) <- zip [0..] [show (length rs) ++ "" ++ t ++ " - \"" ++ intercalate "\" - \"" rs ++ "\" <= 0" | (s,ts) <- lts, (t,rs) <- ts]] ++
       [ "Binary"] ++ 
@@ -197,8 +242,8 @@ printConstraints (LP CPLEX) cp =
 --   M.keys $ M.filter (>= cutoff) counts
 
 -- | Function to solve a SAT provlem using MiniSat. The problem consists
--- | of two parts, a conjunction(!) of premises and a SAT formula to be
--- | solved
+--   of two parts, a conjunction(!) of premises and a SAT formula to be
+--   solved
 solveSat :: (SAT String,SAT String) -> IO [String]
 solveSat sats =
   do
@@ -227,8 +272,8 @@ clean = filter (not . flip elem "_")
 
 
 -- | Function tp onverts a sat problem into MiniSat. The problem is stated in two parts, the
--- | first is the list of premises, the second is the problem to be solved under the
--- | premisses. The premises are supposed to be a conjunction
+--   first is the list of premises, the second is the problem to be solved under the
+--   premisses. The premises are supposed to be a conjunction
 satToMiniSat :: Solver -> (SAT String,SAT String) -> IO (M.Map String Lit, [Lit])
 satToMiniSat solv (prem@(Conj ps),cs) = do
   -- convert all variables into literals and store references in a map
@@ -321,7 +366,8 @@ createGrammars orig abs lang rs =
                                 [ " } ; " ])
                         ) $ M.toList rs
     return (absgram:concgrams)
-    
+
+-- | Function to check if a variable is a rule, i.e. if it is neither a variable for a sentence, a tree or a constraint
 isRule :: String -> Bool
 isRule = not . isId
   where
@@ -371,6 +417,7 @@ xmlToRules s =
 
 -- Objective functions
 
+-- | Objective function that computes the average number of resulting trees
 objAvgNumTrees :: [(String,[(String,[String])])] -> [String]
 objAvgNumTrees lts =
   let
@@ -382,6 +429,8 @@ objAvgNumTrees lts =
     [ "Subject to"] ++
     [ " stc" ++ show i ++ ": " ++ intercalate " + " ts ++ " - sts" ++ show i ++ " = 0" | (i,(_,ts)) <- zip [0..] sts]
 --      [ " obj: " ++ show (1/(fromIntegral .length $ sentVars)) ++ "(" ++ intercalate " + " treeVars ++ ")"] ++ -- average number of trees per sentence
+
+-- | Objective trees that sums the count of rules with the weighted sum of the rules
 objNumTreesWeightedNumRules :: [String] -> [String] -> [String]
 objNumTreesWeightedNumRules treeVars ruleVars =
   let
@@ -392,18 +441,21 @@ objNumTreesWeightedNumRules treeVars ruleVars =
     [ " obj: " ++ intercalate " + " (map (\r -> (show $ (fromIntegral . floor) (ruleCounts M.! r / fromIntegral ruleCount * 100) / 100) ++ r) ruleVars) ++ " + " ++ intercalate " + " treeVars ] ++ -- weighted rules plus number of trees
     [ "Subject to"]
 
+-- | Objective function that counts the number of trees
 objNumTrees :: [String] -> [String] -> [String]
 objNumTrees treeVars ruleVars =
   [ "Minimize" ] ++
   [ " obj: \"" ++ intercalate " + " (nub treeVars) ++ "" ] ++ -- number of trees
   [ "Subject to"]
-  
+
+-- | Objective function that sums the count of trees and the count of rules
 objNumTreesNumRules :: [String] -> [String] -> [String]
 objNumTreesNumRules treeVars ruleVars =
   [ "Minimize" ] ++
   [ " obj: \"" ++ intercalate "\" + \"" (nub ruleVars) ++ "\" + " ++ intercalate " + " (nub treeVars) ++ "" ] ++ -- number of trees plus number of rules
   [ "Subject to"]
 
+-- | Objective function that counts the number of rules
 objNumRules :: [String] -> [String] -> [String]
 objNumRules treeVars ruleVars =
   [ "Minimize" ] ++
