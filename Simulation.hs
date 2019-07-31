@@ -1,6 +1,7 @@
 module Simulation where
 
 import Inference
+import Tool.Tree
 import PGF
 import Data.Maybe
 import qualified Data.Map.Lazy as M
@@ -49,7 +50,7 @@ compareWithGrammar path objName depth ct limit fpgf pgf
       let ss = linearizeTrees pgf ts
       putStrLn $ unlines ss
       putStrLn "*** Generate Grammars"
-      rg <- restrictGrammar fpgf ss
+      rg <- restrictGrammar fpgf ss objNumTreesNumRules
       putStrLn $ show rg
       -- write results
       writeResult dataFile  (length ts) pgf rg
@@ -69,7 +70,7 @@ compareWithGrammar path objName depth ct limit fpgf pgf
                 let ss' = ss ++ linearizeTrees pgf t
                 putStrLn $ unlines ss'
                 putStrLn "*** Generate Grammars"
-                rg <- restrictGrammar fpgf ss'
+                rg <- restrictGrammar fpgf ss' objNumTreesNumRules
                 putStrLn $ show rg
                 writeResult dataFile (length ts') pgf rg
                 simulate' dataFile fpgf pgf  ts' ss' depth limit
@@ -96,7 +97,7 @@ restrictWithTreebankSingle fp pgfp lang =
     pgf <- readPGF pgfp
     let l = fromJust $ readLanguage lang
     -- restrict grammar and write resulting grammar to temp directory (imported from Inference)
-    writeGrammar pgf tmpPath =<< restrictGrammar pgf ss
+    writeGrammar pgf tmpPath =<< restrictGrammar pgf ss objNumTreesNumRules
 --    npgf <- readPGF =<< compileGrammar =<< writeGrammar pgf =<< restrictGrammar pgf ss
     return ()
 
@@ -120,7 +121,7 @@ restrictWithTreebankMulti fp (ppgf1,lang1) (ppgf2,lang2) =
     let l1 = fromJust $ readLanguage lang1
     let l2 = fromJust $ readLanguage lang2
     -- restrict grammar and write resulting grammar to temp directory (imported from Inference)
-    fn <- writeGrammar pgf1 tmpPath =<< restrictMultilingualGrammar (pgf1,l1) (pgf2,l2) ss
+    fn <- writeGrammar pgf1 tmpPath =<< restrictMultilingualGrammar (pgf1,l1) (pgf2,l2) ss objNumTreesNumRules
     putStrLn $ unlines fn
 
 -- | Function to compare the results of restricting a grammar with a treebank. Second part of the compare with treebank experiment

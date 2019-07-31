@@ -58,14 +58,15 @@ linearizeTrees pgf =
 restrictGrammar
   :: PGF                             -- ^ the grammar file to be restricted
   -> [String]                        -- ^ a list of example sentences
+  -> ObjFun                          -- ^ the objective funtion to be used
   -> IO (M.Map Int (Float,[String])) -- ^ the resulting grammars, i.e. lists of syntax rules
-restrictGrammar pgf sentences =
+restrictGrammar pgf sentences ofun =
   do
     putStrLn ">>> Create problem"
     let problem = convertToSetProblem $ mkMultisetProblem pgf sentences
 --    putStrLn $ show problem
     putStrLn ">>> Convert to CPLEX"
-    let lp = printConstraints (LP CPLEX) problem
+    let lp = printConstraints (LP CPLEX) problem ofun
     putStrLn ">>> Write CSP file"
     runCPLEX cplex lp
 
@@ -80,14 +81,15 @@ restrictMultilingualGrammar
   :: (PGF,Language)                  -- ^ the first language, i.e. pgf and language name
   -> (PGF,Language)                  -- ^ the second language, i.e. pgf and language name
   -> [(String,String)]               -- ^ list of pairs of examples
+  -> ObjFun                          -- ^ the objective funtion to be used
   -> IO (M.Map Int (Float,[String])) -- ^ the resulting grammars, i.e. lists of syntax rules
-restrictMultilingualGrammar (pgf1,lang1) (pgf2,lang2) sentences =
+restrictMultilingualGrammar (pgf1,lang1) (pgf2,lang2) sentences ofun =
   do
     putStrLn ">>> Create problem"
     let problem = convertToSetProblem $ mkMultilingMultisetProblem (pgf1,lang1) (pgf2,lang2) sentences
 --    putStrLn $ show problem
     putStrLn ">>> Convert to CPLEX"
-    let lp = printConstraints (LP CPLEX) problem
+    let lp = printConstraints (LP CPLEX) problem ofun
     putStrLn ">>> Write CSP file"
     runCPLEX cplex lp
 

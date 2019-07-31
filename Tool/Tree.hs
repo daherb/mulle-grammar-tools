@@ -30,10 +30,12 @@ module Tool.Tree
   runCPLEX,
   xmlToRules,
   -- * Objective functions
+  ObjFun(..),
   objAvgNumTrees,
   objNumTreesWeightedNumRules,
   objNumTrees,
   objNumRules,
+  objNumTreesNumRules,
   -- * Other functions
   funCounts,
   clean
@@ -158,8 +160,8 @@ convertToMiniSat cp =
         [ Imp (SVar t) (Conj (map (SVar . show) rs))| (s,ts) <- labeled, (t,rs) <- ts]))
 
 -- | Function to print a constraint problem as AMPL
-printConstraints :: ConstraintFormat -> ConstraintProblem String -> String
-printConstraints AMPL cp =
+printConstraints :: ConstraintFormat -> ConstraintProblem String -> ObjFun -> String
+printConstraints AMPL cp _ =
   let
     (LCP lts) = convertToLabeledProblem cp
     vars = [(t,rs) | (s,ts) <- lts, (t,rs) <- ts]
@@ -179,12 +181,12 @@ printConstraints AMPL cp =
       ]
 
 -- | Function to print a constraint problem as LPSolve LP
-printConstraints (LP LPSolve) cp =
+printConstraints (LP LPSolve) cp _ =
   let
     (LCP lts) = convertToLabeledProblem cp
     vars = [(t,rs) | (s,ts) <- lts, (t,rs) <- ts]
     treeVars = map fst vars
-    ruleVars = concatMap snd $ vars 
+    ruleVars = concatMap snd $ vars
   in
     clean $ unlines $
       ["min: " ++ intercalate " + " ruleVars ++ " + " ++ intercalate " + " treeVars ++ ";"] ++
@@ -194,20 +196,17 @@ printConstraints (LP LPSolve) cp =
       ["bin " ++ v ++ ";" | v <- nub treeVars ]
 
 -- | Function to print a constraint problem as CPLEX LP
-printConstraints (LP CPLEX) cp =
+printConstraints (LP CPLEX) cp ofun =
   let
     (LCP lts) = convertToLabeledProblem cp
     vars = [(t,rs) | (s,ts) <- lts, (t,rs) <- ts]
     sentVars = map fst lts
     treeVars = map fst vars
     ruleVars = concatMap snd $ vars
+    oval = case ofun of { OFDict f' -> f' lts ; OFLists f'' -> f'' treeVars ruleVars}
   in
     unlines $
---    (objAvgNumTrees lts) ++
---      (objNumRules treeVars ruleVars) ++
---      (objNumTrees treeVars ruleVars) ++
-      (objNumTreesNumRules treeVars ruleVars) ++
---      (objNumTreesWeightedNumRules treeVars ruleVars) ++
+      oval ++
       [ " cs" ++ show i ++ ": " ++ intercalate " + " c ++ " >= 1" | (i,c) <- zip [0..] [map fst ts | (s,ts) <- lts]] ++
       [ " c" ++ show i ++ ": " ++ c | (i,c) <- zip [0..] [show (length rs) ++ "" ++ t ++ " - \"" ++ intercalate "\" - \"" rs ++ "\" <= 0" | (s,ts) <- lts, (t,rs) <- ts]] ++
       [ "Binary"] ++ 
@@ -417,48 +416,59 @@ xmlToRules s =
 
 -- Objective functions
 
--- | Objective function that computes the average number of resulting trees
-objAvgNumTrees :: [(String,[(String,[String])])] -> [String]
-objAvgNumTrees lts =
-  let
-    sts = [(s,map fst ts) | (s,ts) <- lts]
-    stcs = [(s,length ts) | (s,ts) <- sts]
-  in
-    [ "Minimize" ] ++
-    [ " obj : " ++ intercalate " + " [show (1 / fromIntegral c) ++ "sts" ++ show i | (i,(_,c)) <- zip [0..] stcs]] ++
-    [ "Subject to"] ++
-    [ " stc" ++ show i ++ ": " ++ intercalate " + " ts ++ " - sts" ++ show i ++ " = 0" | (i,(_,ts)) <- zip [0..] sts]
---      [ " obj: " ++ show (1/(fromIntegral .length $ sentVars)) ++ "(" ++ intercalate " + " treeVars ++ ")"] ++ -- average number of trees per sentence
+data ObjFun = OFDict ([(String,[(String,[String])])] -> [String]) | OFLists ([String] -> [String] -> [String])
 
+-- | Objective function that computes the average number of resulting trees
+objAvgNumTrees :: ObjFun -- [(String,[(String,[String])])] -> [String]
+objAvgNumTrees = OFDict
+  (\lts -> 
+      let
+        sts = [(s,map fst ts) | (s,ts) <- lts]
+        stcs = [(s,length ts) | (s,ts) <- sts]
+      in
+        [ "Minimize" ] ++
+        [ " obj : " ++ intercalate " + " [show (1 / fromIntegral c) ++ "sts" ++ show i | (i,(_,c)) <- zip [0..] stcs]] ++
+        [ "Subject to"] ++
+        [ " stc" ++ show i ++ ": " ++ intercalate " + " ts ++ " - sts" ++ show i ++ " = 0" | (i,(_,ts)) <- zip [0..] sts]
+        --      [ " obj: " ++ show (1/(fromIntegral .length $ sentVars)) ++ "(" ++ intercalate " + " treeVars ++ ")"] ++ -- average number of trees per sentence
+  )
+         
 -- | Objective trees that sums the count of rules with the weighted sum of the rules
-objNumTreesWeightedNumRules :: [String] -> [String] -> [String]
-objNumTreesWeightedNumRules treeVars ruleVars =
-  let
-    ruleCounts = Prelude.foldl (\m k -> M.alter (maybe (Just 1) (\n -> Just (n + 1))) k m) M.empty $ ruleVars
-    ruleCount = length $ nub ruleVars
-  in
-    [ "Minimize" ] ++
-    [ " obj: " ++ intercalate " + " (map (\r -> (show $ (fromIntegral . floor) (ruleCounts M.! r / fromIntegral ruleCount * 100) / 100) ++ r) ruleVars) ++ " + " ++ intercalate " + " treeVars ] ++ -- weighted rules plus number of trees
-    [ "Subject to"]
+objNumTreesWeightedNumRules :: ObjFun -- [String] -> [String] -> [String]
+objNumTreesWeightedNumRules = OFLists
+  (\treeVars ruleVars ->
+     let
+       ruleCounts = Prelude.foldl (\m k -> M.alter (maybe (Just 1) (\n -> Just (n + 1))) k m) M.empty $ ruleVars
+       ruleCount = length $ nub ruleVars
+     in
+       [ "Minimize" ] ++
+       [ " obj: " ++ intercalate " + " (map (\r -> (show $ (fromIntegral . floor) (ruleCounts M.! r / fromIntegral ruleCount * 100) / 100) ++ r) ruleVars) ++ " + " ++ intercalate " + " treeVars ] ++ -- weighted rules plus number of trees
+       [ "Subject to"]
+  )
 
 -- | Objective function that counts the number of trees
-objNumTrees :: [String] -> [String] -> [String]
-objNumTrees treeVars ruleVars =
-  [ "Minimize" ] ++
-  [ " obj: \"" ++ intercalate " + " (nub treeVars) ++ "" ] ++ -- number of trees
-  [ "Subject to"]
-
+objNumTrees :: ObjFun -- [String] -> [String] -> [String]
+objNumTrees = OFLists
+  (\treeVars ruleVars ->
+     [ "Minimize" ] ++
+     [ " obj: \"" ++ intercalate " + " (nub treeVars) ++ "" ] ++ -- number of trees
+     [ "Subject to"]
+  )
 -- | Objective function that sums the count of trees and the count of rules
-objNumTreesNumRules :: [String] -> [String] -> [String]
-objNumTreesNumRules treeVars ruleVars =
-  [ "Minimize" ] ++
-  [ " obj: \"" ++ intercalate "\" + \"" (nub ruleVars) ++ "\" + " ++ intercalate " + " (nub treeVars) ++ "" ] ++ -- number of trees plus number of rules
-  [ "Subject to"]
+objNumTreesNumRules :: ObjFun -- [String] -> [String] -> [String]
+objNumTreesNumRules = OFLists
+  (\treeVars ruleVars ->
+     [ "Minimize" ] ++
+     [ " obj: \"" ++ intercalate "\" + \"" (nub ruleVars) ++ "\" + " ++ intercalate " + " (nub treeVars) ++ "" ] ++ -- number of trees plus number of rules
+     [ "Subject to"]
+  )
 
 -- | Objective function that counts the number of rules
-objNumRules :: [String] -> [String] -> [String]
-objNumRules treeVars ruleVars =
-  [ "Minimize" ] ++
-  [ " obj: \"" ++ intercalate "\" + \"" (nub ruleVars) ++ "\"" ] ++ -- number of trees plus number of rules
-  [ "Subject to"]
+objNumRules :: ObjFun -- [String] -> [String] -> [String]
+objNumRules = OFLists
+  (\treeVars ruleVars ->
+     [ "Minimize" ] ++
+     [ " obj: \"" ++ intercalate "\" + \"" (nub ruleVars) ++ "\"" ] ++ -- number of trees plus number of rules
+     [ "Subject to"]
+  )
 -- [("s1",[("t11",[]),("t12",[]),("t13",[]),("t14",[])]),("s2",[("t21",[]),("t22",[])]),("s3",[("t31",[]),("t32",[]),("t33",[]),("t34",[]),("t35",[])]),("s4",[("t41",[])]),("s5",[("t51",[]),("t52",[]),("t53",[])])]
