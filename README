@@ -1,1 +1,6 @@
-This is a collection of tools to work with grammars that can be used with the MULLE system
+This is a collection of tools to work with grammars that can be used with the MULLE system.
+The main part is a subgrammar extraction/grammar inference system.
+
+To run the code you can use `stack ghci` and then call the relevant functions
+
+The path to cplex is currently hard-coded
