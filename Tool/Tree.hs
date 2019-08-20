@@ -472,3 +472,20 @@ objNumRules = OFLists
      [ "Subject to"]
   )
 -- [("s1",[("t11",[]),("t12",[]),("t13",[]),("t14",[])]),("s2",[("t21",[]),("t22",[])]),("s3",[("t31",[]),("t32",[]),("t33",[]),("t34",[]),("t35",[])]),("s4",[("t41",[])]),("s5",[("t51",[]),("t52",[]),("t53",[])])]
+
+splitSubtree :: Expr -> [Expr]
+splitSubtree e =
+  -- let
+  --   unapp = unApp e
+  -- in
+  --   case unapp of {
+  --     Just (f,ps) -> (e:ps) ++ concatMap (splitSubtree dep) ps ;
+  --     Nothing -> []
+  --     }
+  maybe [] id $ fmap (\(f,ps) -> (e:ps) ++ concatMap splitSubtree ps) $ unApp e
+
+pruneSubtree :: Int -> Expr -> Expr
+pruneSubtree 0 e = maybe e id $ fmap (\(f,_) -> mkApp f []) $ unApp e
+pruneSubtree n e = maybe e id $ fmap (\(f,ps) -> mkApp f $ map (pruneSubtree (n - 1)) ps) $ unApp e
+
+
